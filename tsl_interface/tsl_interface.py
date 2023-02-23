@@ -17,8 +17,8 @@ class TslInterface:
         #close the browser
         self.driver.close()
         self.driver.quit()
-        return True
-    
+        return
+        
     def _open_page(self): 
         options = webdriver.ChromeOptions()
         options.add_argument('--ignore-ssl-errors=yes')
@@ -33,6 +33,7 @@ class TslInterface:
         command_executor='http://localhost:4444/wd/hub',
         options=options
         )
+        print('Executing')
         #maximize the window size
         self.driver.maximize_window()
         #navigate to browserstack.com
@@ -41,13 +42,26 @@ class TslInterface:
         time.sleep(3)
         self.driver.find_element(by='id', value='acceptTerms').click()
 
+    def _get_metadata(self: str) -> str:
+        series = self.driver.find_element(by='id', value='seriesName').text
+        session = self.driver.find_element(by='id', value='sessionName').text
+
+        session_date = datetime.datetime.now().date()
+        metadata = {
+            'series': series,
+            'session': session,
+            'date': session_date
+        }
+        return metadata
+
     def _get_table(self: str) -> str:
         table = self.driver.find_element(by='id', value='ResultsTableContainer')
         sub_table = table.find_element(by='id', value='tablebody')
         
         time.sleep(3)
         html = sub_table.get_attribute('outerHTML')
-        data = pd.read_html(html)
+        table = pd.read_html(html)
+        table = table[0]
 
-        return data
+        return table
     
