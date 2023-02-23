@@ -1,0 +1,2690 @@
+/* Minification failed. Returning unminified contents.
+(1500,58-59): run-time warning JS1195: Expected expression: >
+(1503,77-78): run-time warning JS1195: Expected expression: >
+(1503,104-105): run-time warning JS1004: Expected ';': )
+(1510,13-14): run-time warning JS1002: Syntax error: }
+(1514,39-40): run-time warning JS1004: Expected ';': {
+(1995,1-2): run-time warning JS1002: Syntax error: }
+(1995,33-34): run-time warning JS1195: Expected expression: )
+(2350,1-2): run-time warning JS1002: Syntax error: }
+(2352,20-21): run-time warning JS1195: Expected expression: )
+(2646,1-2): run-time warning JS1002: Syntax error: }
+(1971,5,1993,7): run-time warning JS1018: 'return' statement outside of function: return {
+        currentSessionID:currentSessionID,
+        drivers: drivers,
+        classes: classes,
+        getCompetitorByID: findCompetitorById,
+        getClass: findClass,
+        getClassByID: findClassByID,
+        getDriver: findDriver,
+        getDriverByID: findDriverByID,
+        viewModel: viewModel,
+        eventID: eventID,
+        sectors: sectors,
+        missingDrivers: missingDrivers,
+        StreamWeather: weatherBroadcast,
+        RealTime: realtime,
+        StreamSectors: broadcastSectors,
+        refreshData: refreshData,
+        clearCompetitors: clearCompetitors,
+        getFastLapHistory: getClassFastLapHistory,
+        setFastLapHistory: setClassFastLapHistory,
+        setLeaderHistoy: setLeaderHistory,
+        getLeaderHistory: getClassLeaderHistory
+    };
+(2344,5,2348,7): run-time warning JS1018: 'return' statement outside of function: return {
+        onConnected: onConnected,
+        updateClassificationRow: updateClassificationRow,
+        updateIntermediateRow: updateIntermediateRow
+    };
+(2641,5,2644,7): run-time warning JS1018: 'return' statement outside of function: return {
+        start: start,
+        setIsGreenPowerEvent: setIsGreenPowerEvent
+    };
+ */
+/********************************************************           
+* Title: TSL Shared Javascript Library                 *   
+*                                                      *   
+* Author:  Chris Cartledge                             *
+*                                                      *
+* Version: 1.0                                         *   
+*                                                      *   
+* Date:  Thursday, 9th May 2013                        *   
+*                                                      *    
+********************************************************/
+
+function namespace(nsString) {
+    var parts = nsString.split('.'),
+        parent = window,
+        currentPart = '';
+
+    for (var i = 0; i < parts.length; i++) {
+        currentPart = parts[i];
+        parent[currentPart] = parent[currentPart] || {};
+        parent = parent[currentPart];
+    }
+
+    return parent;
+}
+
+// Declare namespace
+tsl = namespace('tsl');
+
+
+tsl.shared = function () {
+
+    var TIME_STAMP_TICKS = 621355968000000000; // 1st Jan 1970 as ticks.
+    var INT64_MAX = 9223372036854775807;
+
+    // Useful for using "startsWith(string)" function in JS.
+    // Checks if there is a comparer function called "startsWith" already; and if not, creates a function called startsWith.
+    if (typeof String.prototype.startsWith != 'function') {
+        String.prototype.startsWith = function (str) {
+            return this.slice(0, str.length) == str;
+        };
+    }
+
+    function convertStringToAMBTimeStamp(timeString, includeDate) {
+        if (timeString == "" || timeString == null) {
+            return INT64_MAX;
+        }
+        //  -- Valid timeString is in the format yyyy-mm-dd - HH:m:ss.fff -- \\
+        var returnValue = 0;
+
+        var year = 1970;
+        var month = 1;
+        var day = 1;
+        var dateStamp = TIME_STAMP_TICKS;
+
+        var dateParts = timeString.split('-');
+        if (dateParts.length == 4) {
+            // The string array contains a date with time as the 4th value.
+            year = dateParts[0].trim();
+            month = dateParts[1].trim();
+            day = dateParts[2].trim();
+
+            dateStamp = new Date(year, month, day).getTime() * 1000;
+
+            if (dateParts[3].indexOf(':') > -1) {
+                // There is a time in the final part of the string.
+                timeString = dateParts[3].trim();
+            }
+        }
+
+        if (includeDate) returnValue = dateStamp;
+
+        var timeParts = timeString.split(':');
+        if (timeParts.length > 3) {
+            // Not a valid time.
+            return INT64_MAX;
+        }
+
+        // Looks like the string contains a valid time value. Set some default values.
+        var hours = 0;
+        var mins = 0;
+        var secs = 0;
+        var currentPart = 0;
+
+        // Check for an hours value.
+        if (timeParts.length == 3) {
+            hours = timeParts[currentPart];
+            currentPart++;
+        }
+
+        // Check for a minutes value.
+        if (timeParts.length >= 2) {
+            mins = timeParts[currentPart];
+            currentPart++;
+        }
+
+        // Check for a seconds value.
+        if (timeParts.length >= 1) {
+            secs = timeParts[currentPart];
+        }
+
+        returnValue += ((hours * 60) + mins) * 60 * 1000000;
+        returnValue += (secs * 1000000);
+
+        return returnValue;
+    }
+
+    function convertAMBTimeStampToString(timeStampValue, includeDate) {
+
+        if (timeStampValue == INT64_MAX) {
+            return "";
+        }
+
+        var tmpValue, tmpString;
+        var negativeValue = (timeStampValue < 0);
+
+        if (negativeValue) {
+            // Flip the time to positive. We'll change it back at the end.
+            tmpValue = -(timeStampValue);
+        } else {
+            tmpValue = timeStampValue;
+        }
+
+        var resFactor = 1000;
+        var divFactor = 1000;
+        // TODO: Add support for resulutions other than 1/1000 of a second.
+
+        var time = Math.floor(tmpValue / divFactor);
+        var days = Math.floor(time / (resFactor * 3600 * 24));
+
+        // If the number of days is greater than 365 then add a calendar date to the string.
+        if (days > 365 && includeDate) {
+            // Create a temporary date object and store the first part of the ISO date string (yyyy-MM-dd).
+            var date = new Date(days * (1000 * 3600 * 24));
+            tmpString = date.toISOString().substr(0, 10);
+        } else tmpString = "";
+
+        time -= (days * resFactor * 3600 * 24);
+
+        // Calculate the hours value.
+        var hours = Math.floor(time / (resFactor * 3600));
+        time -= Math.floor(hours * resFactor * 3600);
+
+        // If the number of days is less than 365, then return the total hours. (eg. 2 days = 48 hours)
+        if (days <= 365) {
+            hours = hours + (days * 24);
+            days = 0;
+        }
+
+        // Calculate the minutes value.
+        var minutes = Math.floor(time / (resFactor * 60));
+        time -= Math.floor(minutes * resFactor * 60);
+
+        // Calculate the seconds value.
+        var seconds = Math.floor(time / resFactor);
+        var milliseconds = time - seconds * resFactor;
+
+        var result = "";
+        if (days == 0 && hours == 0 && minutes == 0) {
+            // Only seconds and milliseconds are needed.
+            result = seconds + "." + pad(milliseconds, 3);
+        }
+        else if (days == 0 && hours == 0) {
+            // Only minutes and seconds are required.
+            result = minutes + ":" + pad(seconds, 2) + "." + pad(milliseconds, 3);
+        } else if (days == 0) {
+            // Hours, minutes and seconds are needed.
+            result = hours + ":" + pad(minutes, 2) + ":" + pad(seconds, 2) + "." + pad(milliseconds, 3);
+        } else {
+            // Full date and time is needed. Use the date string we created earlier.
+            if (includeDate) tmpString += " - ";
+            result = tmpString + pad(hours, 2) + ":" + pad(minutes, 2) + ":" + pad(seconds, 2) + "." + pad(milliseconds, 3);
+        }
+
+        // Make the result negative if the input value was negative.
+        if (negativeValue) result = "-" + result;
+
+        return result;
+    }
+    
+    // Helper function to pad a number with leading zeroes.
+    function pad(inputString, chars) {
+        inputString = inputString + ''; // Make sure the number is treated as a string.
+        return (inputString.length >= chars ? inputString : new Array(chars - inputString.length + 1).join('0') + inputString);
+    }
+
+    function getAMBTimeStampNow() {
+        return new Date().getTime();
+    }
+
+    function getAMBTimeStampUTCNow() {
+        return new Date().getTime();
+    }
+
+    function trimSpeed(speedValue) {
+        var result = "" + speedValue;
+
+        // Trim the string down to 1 decimal place.
+        if (result.indexOf('.') > -1) {
+            result = result.substr(0, result.indexOf('.') + 2);
+        } else {
+            // No demial places...
+            result = result + ".0";
+        }
+
+        return result;
+    }
+
+    function truncateDecimal(decimal, decimalPlaces) {
+
+        // Ensure decimal is treated as a string
+        var result = "" + decimal;
+
+        var decimalIndex = result.indexOf('.');
+
+        // Trim the string to the decired decimal places.
+        if (decimalIndex > -1) {
+            result = result.substr(0, decimalIndex + (decimalPlaces + 1));
+        } else {
+            // No decimal places
+            result += ".";
+            decimalIndex = result.length;
+        }
+
+        // Pad to the correct number of decimal places.
+        while ((result.length - decimalIndex) < decimalPlaces) {
+            result += '0';
+        }
+
+        return result;
+    }
+
+    function parseQueryString() {
+
+        var queries = {}, hash;
+        var hashes = document.location.search.substr(1).split('&');
+        for (var i = 0; i < hashes.length; i++) {
+            hash = hashes[i].split('=');
+            if (hash.length < 2) continue;
+
+            queries[hash[0]] = hash[1];
+        }
+
+        return queries;
+    }
+
+    function convertMetresToMiles(metres) {
+        return metres * 0.000621371;
+    }
+
+    function convertMetresToKilometres(metres) {
+        return metres * 0.001;
+    }
+
+    function readCookieValue(key) {
+
+        key = key + "=";
+
+        var decodedCookie = decodeURIComponent(document.cookie);
+        var parts = decodedCookie.split(';');
+        for (var i = 0; i < parts.length; i++) {
+
+            var part = parts[i];
+            while (part.charAt(0) === ' ') {
+                part = part.substring(1);
+            }
+            if (part.indexOf(key) === 0) {
+                var value = part.substring(key.length, part.length);
+                return value;
+            }
+
+        }
+
+    }
+
+    return {
+        convertStringToAMBTimeStamp: convertStringToAMBTimeStamp,
+        convertAMBTimeStampToString: convertAMBTimeStampToString,
+        ambTimeStampUTCNow: getAMBTimeStampUTCNow,
+        trimSpeed: trimSpeed,
+        truncateDecimal: truncateDecimal,
+        parseQueryString: parseQueryString,
+        convertMetresToMiles: convertMetresToMiles,
+        convertMetresToKilometres: convertMetresToKilometres,
+        readCookieValue: readCookieValue
+    };
+
+}();
+
+
+;function DriverInfo(ID, StartNumber, ClassItem, Name, div) {
+    var self = this;
+    self.ID = ko.observable(ID);
+    self.StartNumber = ko.observable(StartNumber);
+    self.ClassItem = ko.observable(ClassItem);
+    self.Name = ko.observable(Name);
+    self.div = ko.observable(div);
+    self.startPoint = ko.observable(0);
+    self.animateTo = ko.observable(0);
+    self.lastSectorMessageTOD = ko.observable(0);
+    self.lastSectorTime = ko.observable(0);
+    self.inPit = ko.observable(false);
+    self.utilityVehicle = false;
+    self.toggled = ko.observable(true);
+    self.toggleColour = function () {
+        //var elements = $("div[data-class='" + self.Name() + "']");
+
+        if (self.toggled()) {
+            // Hide all members of this class.
+            div.addClass("watching");
+            //.ui-icon-check
+        } else {
+            div.removeClass("watching");
+        }
+        self.toggled(!self.toggled());
+    };
+}
+
+function PittedDriver(Id, startNumber) {
+    var self = this;
+
+    self.Id = Id;
+    self.StartNumber = ko.observable(startNumber);
+
+    return self;
+}
+
+function MissingDriver(MissingMessage) {
+    var self = this;
+    self.ID = MissingMessage.ID;
+    self.StartNumber = ko.observable(MissingMessage.StartNumber);
+    self.Sector = ko.observable(MissingMessage.LastSectorID);
+}
+
+function DriverClass(Class) {
+    var self = this;
+    self.ID = Class.ID;
+
+    self.PrimaryClass = ko.observable("");
+    self.SubClass = ko.observable("");
+    self.Colour = ko.observable("#000000");
+    self.ForeColour = ko.observable("#FFFFFF");
+
+    self.update = function (classMessage) {
+
+        self.PrimaryClass(classMessage.Name);
+        self.SubClass(classMessage.SubClass);
+        self.Colour(classMessage.Colour);
+        self.ForeColour(classMessage.ForeColour);
+    }
+
+    self.update(Class);
+
+    self.Name = ko.computed(function () {
+        if (this.SubClass() != "") {
+            return this.PrimaryClass() + " - " + this.SubClass();
+        }
+        else {
+            return this.PrimaryClass();
+        }
+    }, this);
+
+    self.shown = ko.observable(true);
+
+    self.toggleVisible = function () {
+        var elements = $("div[data-class='" + self.ID + "']");
+
+        if (self.shown()) {
+            // Hide all members of this class.
+            elements.hide();
+        } else {
+            elements.show();
+        }
+
+        self.shown(!self.shown());
+    };
+}
+
+function TyreCompound(compound) {
+    var self = this;
+
+    self.ID = compound.ID;
+
+    self.Name = ko.observable('');
+    self.Colour = ko.observable('#000000');
+
+    self.ShortName = ko.computed(function () {
+
+        return self.Name().split(" ").map(function (name) {
+            return name[0];
+        }).join("").toUpperCase();
+
+    }, self)
+
+    self.ForeColour = ko.computed(function () {
+
+        var r = parseInt(self.Colour().substring(1, 3), 16);
+        var g = parseInt(self.Colour().substring(3, 5), 16);
+        var b = parseInt(self.Colour().substring(5, 7), 16);
+
+        var brightness = Math.sqrt(
+            r * r * .241 +
+            g * g * .691 +
+            b * b * .068);
+
+        return (brightness > 130 ? '#000000' : '#FFFFFF');
+
+    }, self)
+
+    self.update = function (compound) {
+        self.Name(compound.Name);
+        self.Colour(compound.Colour);
+    }
+
+    self.update(compound);
+}
+
+function leaderHistoryItem(comp, message) {
+    var self = this;
+
+
+    self.ID = comp.competitorID();
+    self.RawTOD = message.TimeOfDay;
+    self.TimeOfDay = tsl.shared.convertAMBTimeStampToString(message.TimeOfDay);
+
+    self.Laps = ko.observable();
+    self.DisplayName = ko.observable();
+    self.StartNumber = comp.startNumber;
+    self.PrimaryClass = comp.primaryClass;
+    self.SubClass = comp.subClass;
+    self.Vehicle = comp.vehicle;
+    self.StartLap = ko.observable();
+    self.TotalLapsLed = ko.observable();
+    self.TotalDistance = ko.observable();
+
+    self.update = function (message) {
+        self.Laps(message.Laps);
+        self.DisplayName(message.DisplayName);
+        self.StartLap(message.StartLap);
+        self.TotalLapsLed(message.LapsLed);
+        self.TotalDistance(message.TotalDistance);
+    };
+
+    self.update(message);
+}
+
+function fastLapHistoryItem(comp, message) {
+    var self = this;
+
+    self.ID = comp.competitorID();
+    self.RawTOD = message.TimeOfDay;
+    self.TimeOfDay = tsl.shared.convertAMBTimeStampToString(message.TimeOfDay);
+
+    var competitor = comp;
+
+    self.FastestLapTime = ko.observable();
+    self.LapNumber = ko.observable();
+    self.DisplayName = ko.observable();
+    self.StartNumber = competitor.startNumber;
+    self.PrimaryClass = competitor.primaryClass;
+    self.SubClass = competitor.subClass;
+    self.Vehicle = competitor.vehicle;
+
+    self.TotalDistance = ko.observable();
+    self.FastLapAvgSpeed = ko.observable();
+
+    self.update = function (message) {
+        self.LapNumber(message.LapNumber);
+        self.FastestLapTime(tsl.shared.convertAMBTimeStampToString(message.LapTime));
+
+        self.DisplayName(message.DisplayName);
+
+        self.TotalDistance(message.TotalDistance);
+
+        self.FastLapAvgSpeed(message.AvgSpeed);
+    };
+
+    self.update(message);
+}
+
+function classLeaderHistory() {
+    var self = this;
+    self.Class = ko.observable();
+    self.LeaderHistory = ko.observableArray([]);
+    self.update = function (message) {
+        if (message !== undefined) {
+            self.LeaderHistory.removeAll();
+            self.Class(message.Class);
+            for (i = 0; i < message.LeaderHistory.length; i++) {
+                var lhi = new leaderHistoryItem();
+                lhi.update(message.LeaderHistory[i]);
+                self.LeaderHistory.push(lhi);
+            }
+        }
+    };
+    self.clear = function () {
+        self.LeaderHistory.removeAll();
+    };
+}
+
+function FlagHistoryItem() {
+    var self = this;
+    self.FlagType = ko.observable();
+    self.TimeOfDay = ko.observable();
+    self.update = function (message) {
+        self.FlagType(message.FlagType);
+        self.TimeOfDay(message.TimeOfDay);
+    };
+}
+
+function row() {
+    var self = this;
+
+    self.competitorID = ko.observable();
+    self.position = ko.observable();
+    self.posShift = ko.observable();
+    self.startNumber = ko.observable();
+    self.name = ko.observable();
+    self.lastLapTime = ko.observable();
+    self.inPits = ko.observable(false);
+    self.laps = ko.observable();
+    self.pitStops = ko.observable(0);
+    self.gap = ko.observable();
+    self.diff = ko.observable();
+    self.raceTime = ko.observable();
+    self.raceTimeStamp = ko.observable();
+    self.finishPassingTime = ko.observable();
+    self.currentSessionBest = ko.observable();
+    self.groupBest = ko.observable();
+    self.primaryClass = ko.observable();
+    self.subClass = ko.observable();
+    self.pic = ko.observable();
+    self.personalBestTime = ko.observable(false);
+    self.highlighted = ko.observable(false);
+    self.vehicle = ko.observable();
+    self.status = ko.observable();
+    self.hasPenalties = ko.observable(false);
+    self.raceTimePenalty = ko.observable(0);
+    self.positionPenalty = ko.observable(0);
+    self.lapPenalty = ko.observable(0);
+    self.fastLapPenalty = ko.observable(0);
+    self.predictedPoints = ko.observable(0);
+    self.tyreCompoundId = ko.observable(0);
+
+    self.state = ko.computed(function () {
+        if (self.status() === "Running") {
+            return "Blank";
+        }
+        if (self.status() === "Finished") {
+            return "Finished";
+        }
+        if (self.status() === "Missing") {
+            return "Missing";
+        }
+        return "Blank";
+    }, self);
+
+    self.posShiftDisplay = ko.computed(function () {
+
+        if (self.state() !== "Blank") return "";
+        if (self.inPits()) return "";
+
+        var tmpValue = self.posShift();
+        if (tmpValue < 0) tmpValue = -(tmpValue);
+
+        if (tmpValue === 0) return "";
+
+        return tmpValue;
+
+    }, self)
+
+    self.tyreCompound = ko.computed(function () {
+
+        return ko.utils.arrayFirst(tsl.liveTiming.viewModel.tyreCompounds(), function (compound) {
+            return compound.ID === self.tyreCompoundId()
+        });
+
+    }, self)
+
+    self.update = function (message) {
+        self.competitorID(message.ID);
+        self.position(message.Pos);
+        self.posShift(message.PosShift);
+        self.startNumber(message.StartNumber);
+        self.name(message.Name);
+        self.lastLapTime(message.LastLapTime);
+        self.inPits(message.InPits);
+        self.laps(message.Laps);
+        self.pitStops(message.PitStops);
+        self.gap(message.Gap);
+        self.diff(message.Diff);
+        self.raceTime(tsl.shared.convertAMBTimeStampToString(message.RaceTime));
+        self.raceTimeStamp(message.RaceTime);
+        self.finishPassingTime(message.FinishPassingTime);
+        self.currentSessionBest(message.CurrentSessionBest);
+        self.groupBest(message.GroupBest);
+
+        self.primaryClass(message.PrimaryClass);
+        self.subClass(message.SubClass);
+        self.pic(message.PIC);
+
+        self.personalBestTime(message.PersonalBestTime);
+        self.vehicle(message.Vehicle);
+        self.status(message.Status);
+        self.hasPenalties(message.HasPenalties);
+        self.raceTimePenalty(message.RaceTimePenalty / 1000000);
+        self.positionPenalty(message.PositionPenalty);
+        self.lapPenalty(message.LapPenalty);
+        self.fastLapPenalty(message.FastLapPenalty / 1000000);
+
+        if (message.TyreCompoundID) {
+            self.tyreCompoundId(message.TyreCompoundID);
+        }
+
+        if (message.PrevSessTimes) {
+            ko.utils.arrayForEach(message.PrevSessTimes, function (time) {
+
+                if (self.PrevSessionTimes[time.ID]) {
+                    self.PrevSessionTimes[time.ID](time.Time);
+                }
+
+            });
+        }
+
+        if (message.PredictedPoints) {
+            self.setPoints(message.PredictedPoints);
+        }
+    };
+
+    self.setPoints = function (points) {
+
+        self.predictedPoints(points);
+
+    };
+
+    self.displayname = ko.computed(function () {
+        return self.name();
+    }, self);
+
+    self.overallBestTime = ko.computed(function () {
+        return self.lastLapTime() == tsl.liveTiming.viewModel.sessionFastLapTime();
+    }, self);
+
+    self.createSectorObject = function (sectorKey) {
+
+        if (self[sectorKey]) return;
+
+        self[sectorKey] = ko.observable("");
+
+        self[sectorKey + "_CurrentValue"] = ko.observable(0);
+        self[sectorKey + "_PrevValue"] = ko.observable(0);
+
+        self[sectorKey + "_PB"] = ko.observable(false);
+        self[sectorKey + "_OB"] = ko.computed(function () {
+
+            var s = tsl.liveTiming.viewModel.getSector(sectorKey);
+            if (s) {
+
+                if (s.IsSpeedTrap) {
+                    return self[sectorKey]() == s.BestSpeed();
+                } else {
+                    return self[sectorKey]() == s.BestTime();
+                }
+
+            }
+            return false;
+
+        });
+
+        self[sectorKey + "_IsSlow"] = ko.computed(function () {
+
+            if (!tsl.liveTiming.viewModel.showSlowSectors()) return false;
+
+            var s = tsl.liveTiming.viewModel.getSector(sectorKey);
+            if (s && !s.IsSpeedTrap) {
+
+                if (self[sectorKey + "_PrevValue"]() == 0 || self[sectorKey]() == "" || self[sectorKey] == "OUT LAP") return false;
+                return (self[sectorKey + "_CurrentValue"]() - self[sectorKey + "_PrevValue"]() > tsl.liveTiming.viewModel.slowSectorsValue() * 1000000);
+
+            }
+            return false;
+
+        });
+    };
+
+    self.toggleHighlighting = function () {
+        self.highlighted(!self.highlighted());
+    };
+
+    self.PrevSessionTimes = {};
+
+    self.createPrevSessionEntries = function (sessions) {
+
+        ko.utils.arrayForEach(sessions, function (sessionID) {
+            if (self.PrevSessionTimes[sessionID]) return; // Already exists.
+
+            self.PrevSessionTimes[sessionID] = ko.observable("");
+        });
+    };
+
+    self.clearPrevSessionEntries = function () {
+        self.PrevSessionTimes = {};
+    };
+}
+
+function greenPowerRow() {
+
+    var base = new row();
+    var baseUpdate = base.update;
+
+    base.totalDistanceCovered = ko.observable();
+    base.greenPowerRaceResult = ko.observable();
+    base.averageLapTime = ko.observable();
+    base.averageSpeed = ko.observable();
+
+    base.update = function (message) {
+        baseUpdate(message);
+        if (message.TotalDistanceCovered !== undefined)
+            base.totalDistanceCovered(message.TotalDistanceCovered);
+        if (message.GreenPowerRaceResult !== undefined)
+            base.greenPowerRaceResult(message.GreenPowerRaceResult);
+        if (message.AverageLapTime !== undefined)
+            base.averageLapTime(message.AverageLapTime);
+        if (message.AverageSpeed !== undefined)
+            base.averageSpeed(message.AverageSpeed);
+       
+        var p = base.averageLapTime();
+    }
+    return base;
+}
+
+function SectorData(sectorID) {
+    var self = this;
+
+    self.ID = sectorID;
+    self.Time = ko.observable('');
+}
+
+function LapData(lapNumber) {
+    var self = this;
+
+    self.lapNumber = lapNumber;
+    self.lapTime = ko.observable('');
+
+    self.sectorTimes = new Array();
+    $.each(tsl.liveTiming.viewModel.TrackSectors(), function (index, item) {
+        if (!item.IsSpeedTrap)
+            self.sectorTimes.push(new SectorData(item.ID));
+    });
+}
+
+function rxRow() {
+
+    // Create base 'row' object.
+    var base = new row();
+
+    // Extend base object with our own properties
+    base.lapData = ko.observableArray();
+
+    function createLapObjects() {
+
+        // Clear the current lap data.
+        base.lapData.removeAll();
+
+        // Add a lap object for each lap of the session.
+        for (var l = 1; l <= tsl.liveTiming.viewModel.sessionLaps(); l++) {
+            var lap = new LapData(l);
+
+            base.lapData.push(lap);
+        }
+    }
+
+    // Create the initial lap data.
+    createLapObjects();
+
+    // Override update method.
+    var baseUpdate = base.update;
+
+    base.update = function (message) {
+
+        // Check for lap change.
+        var lapChange = (message.Laps - base.laps());
+
+        // Call base update
+        baseUpdate(message);
+
+        // Run our own logic.
+        // Check for 'LapHistory' field on the message. This field is sent when we first request results from the server.
+        if (message.LapHistory) {
+
+            for (var i = 0; i < message.LapHistory.length; i++) {
+
+                if (i >= base.lapData().length) continue;
+
+                base.lapData()[i].lapTime(message.LapHistory[i].LapTime);
+
+                // Update the sector times for the lap.
+                if (message.LapHistory[i].SectorTimes) {
+
+                    for (var s = 0; s < message.LapHistory[i].SectorTimes.length; s++) {
+
+                        if (s >= base.lapData()[i].sectorTimes.length) continue;
+
+                        // Trim the time to 1dp
+                        var trimmed = tsl.shared.truncateDecimal(message.LapHistory[i].SectorTimes[s], 1);
+                        if (trimmed[0] == '-')
+                            trimmed = "";
+                        base.lapData()[i].sectorTimes[s].Time(trimmed);
+                    }
+
+                }
+            }
+
+        } else if (lapChange === 1) {
+
+            // The lap counter has incremented by 1, update the lap time.
+            if (message.Laps <= base.lapData().length) {
+                base.lapData()[message.Laps - 1].lapTime(message.LastLapTime);
+            }
+        } else if (lapChange < 0) {
+
+            // Lap counter has decremented. Clear all lap data for
+            // laps greater than the current lap count.
+            for (var i = base.lapData().length - 1; i >= message.Laps; i--) {
+
+                // Reset lap time
+                base.lapData()[i].lapTime('');
+
+                // Reset sector times.
+                if (i > message.Laps) {
+
+                    // Clear sector times.
+                    for (var s = 0; s < base.lapData()[i].sectorTimes.length; s++) {
+                        base.lapData()[i].sectorTimes[s].Time('');
+                    }
+
+                }
+            }
+        }
+    }
+
+    base.processIntermediate = function (message) {
+
+        // We're only interested in sector times, not speed traps.
+        if (!message.Time) return;
+
+        var timeString = tsl.shared.convertAMBTimeStampToString(message.Time);
+        if (message.Lap <= base.lapData().length) {
+
+            var lapData = base.lapData()[message.Lap - 1];
+
+            // Find the sector with the correct ID.
+            var sector = ko.utils.arrayFirst(lapData.sectorTimes, function (item) {
+                if (item.ID === message.Id) {
+                    return item;
+                }
+            });
+
+            if (sector) {
+                // Trim the time to 1dp.
+                var trimmed = tsl.shared.truncateDecimal(timeString, 1);
+                sector.Time(trimmed);
+            }
+        }
+    }
+
+    return base;
+}
+
+function lapChartItem() {
+    var self = this;
+
+    self.Lap = ko.observable();
+    self.LapTime = ko.observable();
+    self.IsPersonalBest = ko.observable(false);
+    self.IsSessionBest = ko.observable(false);
+    self.IsOutLap = ko.observable(false);
+    self.IsInLap = ko.observable(false);
+
+    self.IsHovered = ko.observable(false);
+    self.IsSelected = ko.observable(false);
+
+    self.update = function (lapData) {
+        self.Lap(lapData.Lap);
+        if (lapData.LapTime === '') {
+            self.LapTime('&nbsp');
+        }
+        else {
+            self.LapTime(lapData.LapTime);
+        }
+        self.IsPersonalBest(lapData.IsPersonalBest);
+        self.IsSessionBest(lapData.IsSessionBest);
+        self.IsOutLap(lapData.IsOutLap);
+        self.IsInLap(lapData.IsInLap);
+    };
+
+    self.IsLapEven = ko.computed(function () {
+        if (self.Lap() % 2 == 0)
+            return true;
+        else
+            return false;
+    })
+
+    self.onMouseOver = function () {
+        ko.utils.arrayForEach(tsl.liveTiming.viewModel.SessionLapChart(), function (comp) {
+            comp.setHoveredLap(self.Lap());
+        });
+    }
+
+    self.setSelected = function () {
+        var lapToSelect = self.Lap();
+        if (self.IsSelected()) {
+            lapToSelect = -1;
+        }
+        ko.utils.arrayForEach(tsl.liveTiming.viewModel.SessionLapChart(), function (comp) {
+            comp.setSelectedLap(lapToSelect);
+        });
+    }
+
+    self.onMouseOut = function () {
+        ko.utils.arrayForEach(tsl.liveTiming.viewModel.SessionLapChart(), function (comp) {
+            comp.setHoveredLap(-1);
+        });
+    }
+}
+
+function competitorLapChart() {
+    var self = this;
+
+    self.StartNumber = ko.observable();
+    self.LapChart = ko.observableArray([]);
+
+    self.updateStartNo = function (startNo) {
+        self.StartNumber(startNo);
+    }
+
+    self.addLap = function (lapData) {
+        if (lapData.IsSessionBest || lapData.IsPersonalBest) {
+            self.clearBestValues();
+        }
+        var match = ko.utils.arrayFirst(self.LapChart(), function (item) {
+            return item.Lap() === lapData.Lap;
+        });
+        if (match)
+            self.updateLap(lapData);
+        else {
+            var lcItem = new lapChartItem();
+            lcItem.update(lapData);
+            self.LapChart.push(lcItem);
+        }
+    }
+
+    self.updateLap = function (lapData) {
+        var match = ko.utils.arrayFirst(self.LapChart(), function (item) {
+            return item.Lap() === lapData.Lap;
+        });
+        if (match) {
+            if (lapData.IsSessionBest || lapData.IsPersonalBest) {
+                self.clearBestValues();
+            }
+            match.update(lapData);
+        }
+        else {
+            self.addLap(lapData);
+        }
+    }
+
+    self.removeLap = function (lap) {
+        self.LapChart.remove(function (toDelete) { return toDelete.Lap() === lap });
+    }
+
+    self.addBlankLap = function (lapNo) {
+        var lcItem = new lapChartItem();
+        lcItem.Lap(lapNo);
+        lcItem.LapTime('&nbsp');
+        self.LapChart.push(lcItem);
+    }
+
+    self.clearBestValues = function () {
+        ko.utils.arrayForEach(self.LapChart(), function (item) {
+            item.IsPersonalBest(false);
+            item.IsSessionBest(false);
+        });
+    }
+
+    self.clearBestSessionLapTime = function () {
+        var check = ko.utils.arrayFirst(self.LapChart(), function (item) {
+            if (item.IsSessionBest())
+                return item;
+        });
+        if (check) {
+            check.IsSessionBest(false);
+        }
+    }
+
+    self.setSelectedLap = function (lapNo) {
+        ko.utils.arrayForEach(self.LapChart(), function (item) {
+            if (item.Lap() === lapNo) {
+                item.IsSelected(true);
+            }
+            else {
+                item.IsSelected(false);
+            }
+        });
+    }
+
+    self.setHoveredLap = function (lapNo) {
+        ko.utils.arrayForEach(self.LapChart(), function (item) {
+            if (item.Lap() === lapNo) {
+                item.IsHovered(true);
+            }
+            else {
+                item.IsHovered(false);
+            }
+        });
+    }
+}
+
+function lapChartRowNo() {
+    var self = this;
+    self.Number = ko.observable();
+    self.update = function (lapNo) {
+        self.Number(lapNo);
+    };
+
+    self.IsLapEven = ko.computed(function () {
+        if (self.Number() % 2 === 0)
+            return true;
+        else
+            return false;
+    })
+};tsl = namespace('tsl');
+
+tsl.liveTiming = function () {
+    var self = this;
+
+    var eventID = "0";
+    var isGreenPowerEvent = ko.observable(false);
+    var realtime = ko.observable(true);
+    var weatherBroadcast = true;
+    var broadcastSectors = true;
+    var sectors = new Array();
+    var tyreCompounds = ko.observableArray([]);
+
+    var drivers = ko.observableArray([]);
+    var classes = ko.observableArray([]);
+    var inPits = ko.observableArray([]);
+    var missingDrivers = ko.observableArray([]);
+    var watchHeight = ko.observable(0);
+    var rows = ko.observableArray([]);
+
+    var lap = ko.observable("0");
+    var raceTime = ko.observable("0");
+
+    var BestTime = ko.observable("");
+    var Hours = ko.observable("00");
+    var Minutes = ko.observable("00");
+    var Seconds = ko.observable("00");
+    var UTCOffset = ko.observable(0);
+
+    var currentSessionID = 0;
+    var seriesName = ko.observable("");
+    var sessionName = ko.observable("");
+    var sessionTime = ko.observable("");
+    var sessionLaps = ko.observable("");
+    var sessionFastLapTime = ko.observable("");
+    var sessionActualStart = ko.observable("");
+    var trackDisplayName = ko.observable("");
+    var isGrouped = ko.observable(false);
+    var groupType = ko.observable(null);
+    var groupSessions = ko.observableArray([]);
+    var StopClockWhenRed = ko.observable(false);
+    var IsWorldRX = false;
+
+    var sessionType = ko.observable("Race");
+    var CurrentFlag = ko.observable("");
+    var currentLap = ko.computed(function () {
+        var Flag = CurrentFlag();
+        if (Flag && Flag.length > 18) {
+            if (Flag.substring(0, 18) === "Scheduled start...") {
+                return "0";
+            }
+            else {
+                return lap();
+            }
+        }
+        else if (lap() + 1 > sessionLaps()) {
+            return sessionLaps();
+        }
+        else {
+            return lap() + 1;
+        }
+    }, self);
+
+    var TimeRemaining = ko.computed(function () {
+        var whatIsSessionTime = null;
+        whatIsSessionTime = sessionTime();
+        var Time;
+        if (sessionTime() == "" || sessionTime() == null || sessionTime() == "null") {
+
+            var laps = currentLap();
+            Time = "<span>Lap: </span>" + laps + "/" + sessionLaps();
+        }
+        else {
+            Time = Hours() + ':' + Minutes() + ':' + Seconds();
+        }
+        return Time;
+    }, self);
+
+    var ShowSectors = ko.observable(true);
+    var ShowVehicle = ko.observable(true);
+    var showSlowSectors = ko.observable(false);
+    var slowSectorsValue = ko.observable(0.5);
+
+    var showPoints = ko.observable(false);
+
+    var showPrimaryClassColumn = ko.computed(function () {
+
+        return (seriesName() && seriesName().toUpperCase().indexOf("SPRINTX") >= 0);
+
+    }, self);
+
+    var trackSectors = ko.observableArray(new Array());
+    var getSector = function (key) {
+        return ko.utils.arrayFirst(trackSectors(), function (item) {
+            return item.ID === key;
+        });
+    };
+
+    var getFirstSector = function () {
+        return ko.utils.arrayFirst(trackSectors(), function (item) {
+            return item.StartPoint == 0;
+        });
+    };
+    var getFinishSector = function () {
+        return ko.utils.arrayFirst(trackSectors(), function (item) {
+            return !item.IsSpeedTrap && (item.StartPoint + item.Length) == Math.max.apply(null, ko.utils.arrayMap(trackSectors(), function (e) {
+                return (e.StartPoint + e.Length);
+            }));
+        });
+    };
+
+    var SectorToggle = ko.computed(function () {
+        return trackSectors().length > 0;
+    }, self);
+
+    var _weatherConditions = ko.observable("");
+    var _airTemp = ko.observable(0);
+
+    var weatherConditions = ko.computed(function () {
+        var weatherString = _weatherConditions();
+
+        if (_airTemp() != 0 && realtime() == true) {
+            weatherString += " (" + _airTemp() + "\u00B0C)";
+        }
+
+        return weatherString;
+    }, self);
+
+    var _trackConditions = ko.observable("");
+    var _trackTemp = ko.observable(0);
+
+    var trackConditions = ko.computed(function () {
+        var trackString = _trackConditions();
+
+        if (_trackTemp() != 0 && realtime() == true) {
+            trackString += " (" + _trackTemp() + "\u00B0C)";
+        }
+        return trackString;
+
+    }, self);
+
+    var Humidity = ko.observable("0");
+    var WindSpeed = ko.observable("0");
+    var Pressure = ko.observable("0");
+    var WindDirection = ko.observable("0");
+    var DailyRainfall = ko.observable("0");
+
+    var ShowWeather = ko.computed(function () {
+        if ((realtime() == true) && (_airTemp() != 0 || _trackTemp() != 0 || Humidity() != 0 || WindSpeed() != 0 || Pressure() != 0 || WindDirection() != 0 || DailyRainfall() != 0)) {
+            return true;
+        }
+        return false;
+    }, self);
+
+    var SessionState = ko.observable("");
+    var ConnectionStatus = ko.observable("");
+
+    var RaceLineOne = ko.observable(" ");
+    var RaceLineTwo = ko.observable(" ");
+
+    var RC1 = ko.computed(function () {
+        if ($(window).width() < 480) {
+            return "<marquee>" + RaceLineOne() + "</marquee>";
+        }
+        else {
+            return RaceLineOne();
+        }
+    }, self);
+
+    var RC2 = ko.computed(function () {
+        if ($(window).width() < 480) {
+            return "<marquee>" + RaceLineTwo() + "</marquee>";
+        }
+        else {
+            return RaceLineTwo();
+        }
+
+    }, self);
+
+    var sortMethod = ko.observable("");
+
+    var classificationTemplate = ko.computed(function () {
+
+        if (isGrouped()) {
+            if (sessionType() === "Qual") return "gt-template";
+            else return "race-template";
+        }
+
+        switch (sessionType()) {
+            case "Qual":
+                if (sortMethod() === "SumBestTimeTeamDrivers" || sortMethod() === "AvgBestTimeTeamDrivers") {
+                    return "gt-template";
+                }
+                return isGrouped() ? "comb-template" : "qual-template";
+
+            case "Race":
+                return "race-template";
+
+            case "Rallycross":
+                return "rx-template";
+
+            default:
+                return "qual-template";
+        }
+
+    }, self);
+
+    var groupBestColumnHeader = ko.computed(function () {
+        if (isGrouped()) {
+            switch (groupType()) {
+                case "AverageBest":
+                    return "Avg. Time";
+
+                case "AggregateBests":
+                    return "Ovr. Time";
+
+                case "OverallBest":
+                    return "Best Time";
+            }
+        }
+        else {
+            switch (sortMethod()) {
+                case "SumBestTimeTeamDrivers":
+                    return "Ovr. Time";
+
+                case "AvgBestTimeTeamDrivers":
+                    return "Avg. Time";
+            }
+        }
+
+        return "Best";
+
+    }, self);
+
+    var prevSessionsAsDrivers = ko.computed(function () {
+        return (!isGrouped() && (sortMethod() === "SumBestTimeTeamDrivers" || sortMethod() === "AvgBestTimeTeamDrivers"))
+    })
+
+    var classCount = ko.computed(function () {
+
+        return classes().length;
+
+    }, self);
+
+    var showTyreInfo = ko.computed(function () {
+        return tyreCompounds().length > 0;
+    }, self);
+
+
+    // Session statistics properties.
+    var IsImperial = ko.observable(false);
+    var GreenFlagsCount = ko.observable("");
+    var RedFlagsCount = ko.observable("");
+    var FCYFlagsCount = ko.observable("");
+    var SafetyCarsCount = ko.observable("");
+    var TimeUnderFCY = ko.observable("");
+    var TimeUnderRed = ko.observable("");
+    var TimeUnderSafetyCar = ko.observable("");
+    var TimeUnderGreen = ko.observable("");
+    var LapsUnderGreen = ko.observable("");
+    var LapsUnderRed = ko.observable("");
+    var LapsUnderSC = ko.observable("");
+    var LapsUnderFCY = ko.observable("");
+    var TrackLength = ko.observable(0);
+    var PlannedStart = ko.observable("");
+    var SessionFinishTime = ko.observable("");
+    var LeaderHistory = ko.observableArray([]);
+    var FlagHistory = ko.observableArray([]);
+    var TotalCompetitorsLaps = ko.observable("");
+    var TotalDistanceCovered = ko.observable("");
+    var statsSelectedClass = ko.observable("All");
+
+    var SessionLapChart = ko.observableArray([]);
+
+    var LapChartRows = ko.computed(function () {
+        var lapCount = 0;
+        ko.utils.arrayForEach(SessionLapChart(), function (comp) {
+            if (comp.LapChart().length > lapCount)
+                lapCount = comp.LapChart().length;
+        });
+        var lapChartRows = ko.observableArray();
+        for (k = 1; k <= lapCount; k++) {
+            var row = new lapChartRowNo();
+            row.update(k);
+            lapChartRows.push(row);
+        }
+        return lapChartRows;
+    }, this);
+
+    var SortedSessionLapChart = ko.computed(function () {
+        return SessionLapChart.sort(function (comp1, comp2) {
+            if (sessionType() !== "Race") {
+                var aNumber = Number.parseInt(comp1.StartNumber());
+                var bNumber = Number.parseInt(comp2.StartNumber());
+                return (aNumber < bNumber ? -1 : 1);
+            } else {
+                var aComp = ko.utils.arrayFirst(rows(), function (row) {
+                    return row.startNumber() === comp1.StartNumber();
+                });
+                var bComp = ko.utils.arrayFirst(rows(), function (row) {
+                    return row.startNumber() === comp2.StartNumber();
+                });
+                if (aComp !== null && bComp !== null)
+                    return (aComp.position() < bComp.position() ? -1 : 1);
+                else
+                    return -1;
+            }
+        });
+    });
+
+    var trackLengthConverted = ko.computed(function () {
+
+        var distance = TrackLength();
+        var dp = 4;
+
+        if (IsImperial()) {
+            distance = tsl.shared.convertMetresToMiles(distance);
+        } else {
+            distance = tsl.shared.convertMetresToKilometres(distance);
+            dp = 3;
+        }
+
+        return tsl.shared.truncateDecimal(distance, dp) + (IsImperial() ? " mi." : " km");
+
+    }, self);
+
+    var fastLapHistories = { All: ko.observableArray() };
+
+    var fastLapHistoryList = ko.computed(function () {
+        className = statsSelectedClass();
+
+        if (fastLapHistories[className]) {
+            return fastLapHistories[className];
+        } else {
+            return fastLapHistories["All"];
+        }
+    });
+
+    function getClassFastLapHistory(className) {
+        if (className === 0) className = "All";
+        return fastLapHistories[className];
+    }
+
+    function setClassFastLapHistory(className, history) {
+
+        if (fastLapHistories[className]) {
+            fastLapHistories[className].removeAll();
+
+            for (var i = 0; i < history.length; i++) {
+                fastLapHistories[className].push(history[i]);
+            }
+        } else {
+            fastLapHistories[className] = ko.observableArray(history);
+        }
+    }
+
+    var leaderHistories = { All: ko.observableArray() };
+
+    var leaderHistoryList = ko.computed(function () {
+        className = statsSelectedClass();
+
+        if (leaderHistories[className]) {
+            return leaderHistories[className];
+        } else {
+            return leaderHistories["All"];
+        }
+    });
+
+    function getClassLeaderHistory(classID) {
+        if (classID === 0) classID = "All";
+        return leaderHistories[classID];
+    }
+
+    function setLeaderHistory(classID, history) {
+        if (leaderHistories[classID]) {
+            leaderHistories[classID].removeAll();
+
+            for (var i = 0; i < history.length; i++) {
+                leaderHistories[classID].push(history[i]);
+            }
+        } else {
+            leaderHistories[classID] = ko.observableArray(history);
+        }
+    }
+
+    function setIsGreenPowerEvent(val) {
+        isGreenPowerEvent(val);
+    }
+
+    function updateSessionData(message) {
+
+        if (currentSessionID !== message.ID) {
+            reset();
+        }
+
+        if (message.State === "Complete") {
+            clearCompetitors();
+            updateTimeRemaining({ d:['00', '00', '00'] })
+        }
+
+        currentSessionID = message.ID;
+        seriesName(message.Series);
+        sessionName(message.Name);
+        sessionTime(message.LengthTime);
+        sessionLaps(message.LengthLaps);
+        sessionType(message.Type);
+        sessionFastLapTime(message.FastLapTime);
+        trackDisplayName(message.TrackDisplayName);
+        TrackLength(message.TrackLength);
+
+        IsImperial(message.Units === "Imperial");
+
+        if (message.PlannedStart !== null) {
+            PlannedStart(message.PlannedStart);
+        }
+
+        _weatherConditions(message.WeatherConditions);
+        _trackConditions(message.TrackConditions);
+        isGrouped(message.IsGrouped);
+        groupType(message.GroupType);
+
+        if (message.PrevSessions) {
+            groupSessions(message.PrevSessions);
+            updatePrevSessions(message.PrevSessions);
+        }
+        else {
+            groupSessions([]);
+            clearPrevSessions();
+        }
+
+
+        sortMethod(message.SortMethod);
+        StopClockWhenRed(message.StopClockWhenRed);
+        UTCOffset(message.UTCOffset);
+
+        SessionState(message.State);
+        updateFlagState(message);
+
+        for (var i in message.TrackSectors) {
+            updateTrackSector(message.TrackSectors[i]);
+        }
+
+        processTyreCompounds(message.TyreCompounds);
+    };
+
+    function processClass(message) {
+
+        var cl = findClassByID(message.ID);
+
+        if (!cl) {
+            // New Class
+            cl = new DriverClass(message);
+            classes.push(cl);
+        } else {
+
+            // Existing class.
+            cl.update(message);
+        }
+
+        $("div[data-class='" + message.ID + "']").css("background-color", message.Colour).css("color", message.ForeColour);
+
+    }
+
+    function processTyreCompounds(compounds) {
+
+        if (!compounds || compounds.length === 0) {
+            // All Compounds have been cleared
+            tyreCompounds([]);
+        } else {
+            ko.utils.arrayForEach(compounds, (compound) => {
+
+                // Find existing compound.
+                var existing = ko.utils.arrayFirst(tyreCompounds(), (item) => (item.ID === compound.ID));
+                if (existing) {
+                    existing.update(compound);
+                } else {
+                    tyreCompounds.push(new TyreCompound(compound));
+                }
+
+            });
+        }
+    }
+
+    function updateFlagState(message) {
+
+        var state = message.Flag;
+        var trackFill = "Grey";
+        var flagText = state;
+
+        // Remove all classes from controls.
+        var controls = $('#currentflag, #tabsul');
+        controls.removeClass('green');
+        controls.removeClass('safetyCar');
+        controls.removeClass('fcy');
+        controls.removeClass('red');
+        controls.removeClass('finished');
+
+        switch (state) {
+
+            case "Finished":
+            case "Complete":
+                flagText = "Finished";
+                controls.addClass('finished');
+                break;
+
+            case "Red":
+                clearInterval(countdownTicker);
+                flagText = "Red Flag";
+                controls.addClass('red');
+                break;
+
+            case "Yellow":
+                flagText = "Safety Car";
+                controls.addClass('safetyCar');
+                break;
+
+            case "FCY":
+                flagText = "Full Course Yellow";
+                controls.addClass('fcy');
+                break;
+
+            case "Green":
+                clearInterval(countdownTicker);
+                countdownTicker = setInterval(countdownTimer, 1000);
+                flagText = "Running";
+                controls.addClass('green');
+                break;
+
+            case "Pending":
+            case "Active":
+            case "None":
+                flagText = "Scheduled Start: " + message.PlannedStart;
+                break;
+
+        }
+
+        tsl.liveTiming.viewModel.CurrentFlag(flagText);
+
+        for (var i = 0; i < sectors.length; i++) {
+            sectors[i].attr('fill', trackFill);
+        }
+    }
+
+    function updatePrevSessions(sessions) {
+        var vm = tsl.liveTiming.viewModel;
+
+        ko.utils.arrayForEach(vm.rows(), function (item) {
+            item.createPrevSessionEntries(sessions);
+        });
+    }
+
+    function clearPrevSessions() {
+        var vm = tsl.liveTiming.viewModel;
+
+        ko.utils.arrayForEach(vm.rows(), function (item) {
+            item.clearPrevSessionEntries();
+        });
+    }
+
+    function updateTrackSector(message) {
+
+        var vm = tsl.liveTiming.viewModel;
+        var s = vm.getSector(message.ID);
+        if (message.StartPoint === -1) {
+            vm.TrackSectors.remove(s);
+        }
+        else {
+            if (message.BestSpeed) {
+                message.BestSpeed = tsl.shared.trimSpeed(message.BestSpeed);
+            }
+
+            if (!s) {
+                // Convert the best fields into observables.
+                message.BestTime = ko.observable(tsl.shared.convertAMBTimeStampToString(message.BestTime));
+                message.BestSpeed = ko.observable(message.BestSpeed);
+
+                //array sort
+                vm.TrackSectors.push(message);
+
+                ko.utils.arrayForEach(vm.rows(), function (item) {
+                    item.createSectorObject(message.ID);
+                });
+
+            } else {
+                s.Name = message.Name;
+                s.IsSpeedTrap = message.IsSpeedTrap;
+                s.StartPoint = message.StartPoint;
+                s.Length = message.Length;
+                s.BestSpeed(message.BestSpeed);
+                s.BestTime(tsl.shared.convertAMBTimeStampToString(message.BestTime));
+            }
+        }
+
+        vm.TrackSectors.sort(function (left, right) {
+            var leftEnd = (left.StartPoint + left.Length);
+            var rightEnd = (right.StartPoint + right.Length);
+
+            if (leftEnd < rightEnd) return -1;
+            else if (leftEnd > rightEnd) return 1;
+            else {
+                if (left.IsSpeedTrap && !right.IsSpeedTrap) return 1;
+                else if (!left.IsSpeedTrap && right.IsSpeedTrap) return -1;
+                else return 0;
+            }
+        });
+
+    };
+
+    function updateTimeRemaining(message) {
+        clearInterval(countdownTicker);
+
+        var duration = message.d;
+        Hours(duration[0]);
+        Minutes(duration[1]);
+        Seconds(duration[2]);
+
+        if (message.r) {
+            countdownTicker = setInterval(countdownTimer, 1000);
+        } else {
+            clearInterval(countdownTicker);
+        }
+    };
+
+    var viewModel = {
+        rows: rows,
+        lap: lap,
+        raceTime: raceTime,
+        BestTime: BestTime,
+        Hours: Hours,
+        Minutes: Minutes,
+        Seconds: Seconds,
+        UTCOffset: UTCOffset,
+
+        seriesName: seriesName,
+        sessionName: sessionName,
+        sessionTime: sessionTime,
+        sessionLaps: sessionLaps,
+        sessionType: sessionType,
+        sessionFastLapTime: sessionFastLapTime,
+        sessionActualStart: sessionActualStart,
+        trackDisplayName: trackDisplayName,
+        CurrentFlag: CurrentFlag,
+        currentLap: currentLap,
+        TimeRemaining: TimeRemaining,
+        ShowSectors: ShowSectors,
+        ShowVehicle: ShowVehicle,
+        ShowWeather: ShowWeather,
+        ShowPoints: showPoints,
+        ShowPrimaryClass: showPrimaryClassColumn,
+        TrackSectors: trackSectors,
+        getSector: getSector,
+        StopClockWhenRed: StopClockWhenRed,
+        showSlowSectors: showSlowSectors,
+        slowSectorsValue: slowSectorsValue,
+        IsWorldRX: IsWorldRX,
+        getFirstSector: getFirstSector,
+        getFinishSector: getFinishSector,
+        SectorToggle: SectorToggle,
+        AirTemp: _airTemp,
+        TrackTemp: _trackTemp,
+        Humidity: Humidity,
+        WindSpeed: WindSpeed,
+        Pressure: Pressure,
+        WindDirection: WindDirection,
+        DailyRainfall: DailyRainfall,
+        weatherConditions: weatherConditions,
+        trackConditions: trackConditions,
+        classificationTemplate: classificationTemplate,
+
+        groupSessions: groupSessions,
+        groupBestColumnHeader: groupBestColumnHeader,
+        prevSessionsAsDrivers: prevSessionsAsDrivers,
+
+        IsImperial: IsImperial,
+        GreenFlagsCount: GreenFlagsCount,
+        RedFlagsCount: RedFlagsCount,
+        SafetyCarsCount: SafetyCarsCount,
+        FCYFlagsCount: FCYFlagsCount,
+        TimeUnderGreen: TimeUnderGreen,
+        TimeUnderRed: TimeUnderRed,
+        TimeUnderSafetyCar: TimeUnderSafetyCar,
+        TimeUnderFCY: TimeUnderFCY,
+
+        LapsUnderGreen: LapsUnderGreen,
+        LapsUnderRed: LapsUnderRed,
+        LapsUnderSC: LapsUnderSC,
+        LapsUnderFCY: LapsUnderFCY,
+
+        TrackLengthMetres: TrackLength,
+        TrackLengthDisplay: trackLengthConverted,
+        PlannedStart: PlannedStart,
+        SessionFinishTime: SessionFinishTime,
+        FastLapHistory: fastLapHistoryList,
+        LeaderHistory: leaderHistoryList,
+        FlagHistory: FlagHistory,
+        TotalCompetitorsLaps: TotalCompetitorsLaps,
+        TotalDistanceCovered: TotalDistanceCovered,
+        StatsSelectedClass: statsSelectedClass,
+
+        SessionState: SessionState,
+        ConnectionStatus: ConnectionStatus,
+
+        RaceLineOne: RaceLineOne,
+        RaceLineTwo: RaceLineTwo,
+
+        RC1: RC1,
+        RC2: RC2,
+
+        showTyreInfo: showTyreInfo,
+        tyreCompounds: tyreCompounds,
+
+        classCount: classCount,
+        classes: classes,
+        inPit: inPits,
+        missingDrivers: missingDrivers,
+        drivers: drivers,
+        watchHeight: watchHeight,
+
+        updateSessionData: updateSessionData,
+        updateTrackSector: updateTrackSector,
+        updateTimeRemaining: updateTimeRemaining,
+
+        isGreenPowerEvent: isGreenPowerEvent,
+        setIsGreenPowerEvent: setIsGreenPowerEvent,
+
+        SessionLapChart: SessionLapChart,
+        LapChartRows: LapChartRows,
+        SortedSessionLapChart: SortedSessionLapChart
+    };
+
+    function findClass(className) {
+        var arr = classes(),
+            i = classes().length;
+
+        while (i--) {
+            if (arr[i].Name() === className) return arr[i];
+        }
+        return undefined;
+    }
+
+    function findClassByID(classID) {
+        var arr = classes(),
+            i = classes().length;
+
+        while (i--) {
+            if (arr[i].ID == classID) return arr[i];
+        }
+        return undefined;
+    }
+
+    function findDriver(startNumber) {
+        var arr = drivers(),
+            i = drivers().length;
+
+        while (i--) {
+            if (arr[i].StartNumber() === startNumber) return arr[i];
+        }
+        return null;
+    }
+
+    function findDriverByID(id) {
+        var arr = drivers(),
+            i = drivers().length;
+
+        while (i--) {
+            if (arr[i].ID() === id) return arr[i];
+        }
+        return null;
+    }
+
+    function findCompetitorById(competitorId) {
+        return ko.utils.arrayFirst(rows(), function (item) {
+            return item.competitorID() == competitorId;
+        });
+    }
+
+    function clearCompetitors() {
+
+        $('#competitorContainer .competitor').remove();
+
+        drivers.removeAll();
+        inPits.removeAll();
+        missingDrivers.removeAll();
+    }
+
+    function reset() {
+        viewModel.rows.removeAll();
+        viewModel.BestTime("");
+        viewModel.lap("0");
+        viewModel.ShowPoints(false);
+        clearCompetitors();
+        classes.removeAll();
+        trackSectors.removeAll();
+        SessionLapChart.removeAll();
+    }
+
+    var countdownTicker;
+    function countdownTimer() {
+        if (tsl.liveTiming.viewModel.Seconds() - 1 < 0) {
+            if (tsl.liveTiming.viewModel.Minutes() - 1 < 0) {
+                if (tsl.liveTiming.viewModel.Hours() - 1 < 0) {
+                    clearInterval(countdownTicker);
+                } else {
+                    tsl.liveTiming.viewModel.Hours((tsl.liveTiming.viewModel.Hours() - 1) < 10 ? '0' + (tsl.liveTiming.viewModel.Hours() - 1) : (tsl.liveTiming.viewModel.Hours() - 1));
+                    tsl.liveTiming.viewModel.Minutes(59);
+                    tsl.liveTiming.viewModel.Seconds(59);
+                }
+            } else {
+                tsl.liveTiming.viewModel.Minutes((tsl.liveTiming.viewModel.Minutes() - 1) < 10 ? '0' + (tsl.liveTiming.viewModel.Minutes() - 1) : (tsl.liveTiming.viewModel.Minutes() - 1));
+                tsl.liveTiming.viewModel.Seconds(59);
+            }
+        } else {
+            tsl.liveTiming.viewModel.Seconds((tsl.liveTiming.viewModel.Seconds() - 1) < 10 ? '0' + (tsl.liveTiming.viewModel.Seconds() - 1) : (tsl.liveTiming.viewModel.Seconds() - 1));
+        }
+    }
+
+    function refreshData() {
+        var hub = $.connection.liveTiming;
+
+        var classificationPresent = (typeof Classification !== "undefined");
+        var trackingPresent = (typeof Tracking !== "undefined");
+        var weatherPresent = (typeof Weather !== "undefined");
+        var statisticsPresent = (typeof Statistics !== "undefined");
+        var lapChartPresent = (typeof LapChart !== "undefined");
+
+        if (hub) {
+            reset();
+            hub.server.getSessionData(tsl.liveTiming.eventID).done(function (sessionMessage) {
+                if (sessionMessage) {
+                    tsl.liveTiming.viewModel.updateSessionData(sessionMessage);
+
+                    hub.server.getClasses(tsl.liveTiming.eventID).done(function (classes) {
+
+                        $.each(classes, function (index, item) {
+
+                            processClass(item);
+
+                        });
+
+                    });
+
+                    hub.server.getClassification(tsl.liveTiming.eventID).done(function (classification) {
+
+                        for (var i = 0; i < classification.length; i++) {
+
+                            if (classificationPresent) {
+                                Classification.updateClassificationRow(classification[i]);
+                            }
+
+                            if (trackingPresent) {
+                                Tracking.processCompetitorMessage(classification[i]);
+                            }
+                        }
+
+                        if (statisticsPresent) {
+                            Statistics.onConnected();
+                        }
+
+                        if (lapChartPresent) {
+                            LapChart.forceInitialize = true;
+                            LapChart.onConnected();
+                        }
+
+                        if (broadcastSectors && classificationPresent) {
+
+                            hub.server.getIntermediatesSpeeds(tsl.liveTiming.eventID).done(function (intermediateSpeeds) {
+
+                                for (var i = 0; i < intermediateSpeeds.length; i++) {
+                                    Classification.updateIntermediateRow(intermediateSpeeds[i], true);
+                                }
+                            });
+
+                            hub.server.getIntermediatesTimes(tsl.liveTiming.eventID).done(function (intermediateTimes) {
+
+                                for (var i = 0; i < intermediateTimes.length; i++) {
+                                    Classification.updateIntermediateRow(intermediateTimes[i], true);
+                                }
+                            });
+                        }
+
+                    });
+
+                    onConnected(hub);
+
+                    if (classificationPresent) {
+                        Classification.onConnected();
+                    }
+
+                    if (trackingPresent) {
+                        Tracking.updateSession(sessionMessage);
+                        Tracking.onConnected();
+
+                        hub.server.sendCurrentTrackingData(tsl.liveTiming.eventID);
+                    }
+
+                    if (weatherPresent) {
+                        Weather.onConnected();
+                    }
+
+                    // Clear the loading screen.
+                    $('#loading').remove();
+                }
+            });
+        }
+    }
+
+    function onConnected(hub) {
+
+        // Subscribe to global live system events.
+        hub.on('updateSession', updateSessionData);
+
+        hub.on('updateSector', function (message) {
+            updateTrackSector(message);
+        });
+
+        hub.on('RemoveCompetitor', function (ID) {
+            var match = ko.utils.arrayFirst(rows(), function (row) {
+                return row.competitorID() === ID;
+            });
+            if (match) {
+                rows.remove(match);
+            }
+        });
+
+        hub.on('updateClass', function (message) {
+
+            processClass(message);
+
+        });
+
+        hub.on('removeClass', function (message) {
+            var i = classes().length;
+            while (i--) {
+                if (classes()[i].ID === message.ID) {
+                    classes.remove(classes()[i]);
+                }
+            }
+        });
+    }
+
+    return {
+        currentSessionID:currentSessionID,
+        drivers: drivers,
+        classes: classes,
+        getCompetitorByID: findCompetitorById,
+        getClass: findClass,
+        getClassByID: findClassByID,
+        getDriver: findDriver,
+        getDriverByID: findDriverByID,
+        viewModel: viewModel,
+        eventID: eventID,
+        sectors: sectors,
+        missingDrivers: missingDrivers,
+        StreamWeather: weatherBroadcast,
+        RealTime: realtime,
+        StreamSectors: broadcastSectors,
+        refreshData: refreshData,
+        clearCompetitors: clearCompetitors,
+        getFastLapHistory: getClassFastLapHistory,
+        setFastLapHistory: setClassFastLapHistory,
+        setLeaderHistoy: setLeaderHistory,
+        getLeaderHistory: getClassLeaderHistory
+    };
+
+}();;Classification = function () {
+    var refreshPeriod = 30; // Interval in seconds to refresh page.
+    var _currentSessionID = 0;
+    var _showingPointsColumn = false;
+
+    var hub = $.connection.liveTiming;
+
+    function init() {
+        var EventID = tsl.liveTiming.eventID;
+        var realTime = tsl.liveTiming.RealTime;
+        var WeatherBroadcast = tsl.liveTiming.StreamWeather;
+        var BroadcastSectors = tsl.liveTiming.BroadcastSectors;
+
+
+        // Event listener to when Sector Show/Hide button is clicked.
+        $('#btnSectorsOnOff').click(function () {
+            var sectorsShown = tsl.liveTiming.viewModel.ShowSectors(); // Find if sectors are shown and set sectorsShown boolean
+            if (sectorsShown) {
+                // If sectors are shown, set them to be hidden.
+                tsl.liveTiming.viewModel.ShowSectors(false);
+                $('#btnSectorsOnOff').val('Show Sectors');
+            }
+            else {
+                // If sectors are not shown, set them to be visible.
+                tsl.liveTiming.viewModel.ShowSectors(true);
+                $('#btnSectorsOnOff').val('Hide Sectors');
+            }
+        });
+
+        $('#btnVehicleShow').click(function () {
+            if ($('.vehicle').css('display') !== 'none') {
+                tsl.liveTiming.viewModel.ShowVehicle(false);
+                $('#btnVehicleShow').val('Show Vehicles');
+            }
+            else {
+                tsl.liveTiming.viewModel.ShowVehicle(true);
+                $('#btnVehicleShow').val('Hide Vehicles');
+            }
+        });
+
+        var refreshTicks;
+        //Caller removal from Broadcast
+        $('#BroadcastOff').click(function () {
+            $('#BroadcastOn').show();
+            $('#Refresh').show();
+            $('#refreshPeriod').show();
+            $('#BroadcastOff').hide();
+            $('#tabs').tabs('option', 'disabled', [1]);
+            tsl.liveTiming.RealTime(false);
+            tsl.liveTiming.StreamSectors = false;
+
+            if (hub) {
+                hub.server.changeRegistration(tsl.liveTiming.eventID, realTime(), tsl.liveTiming.StreamSectors, tsl.liveTiming.StreamWeather);
+            }
+
+
+            $('#refreshPeriod').val(refreshPeriod);
+
+            function countdownRefresh() {
+                refreshPeriod--;
+                $('#refreshPeriod').val(refreshPeriod);
+                if (refreshPeriod == 0) {
+                    refresh();
+                }
+            }
+            refreshTicks = setInterval(countdownRefresh, 1000);
+        });
+
+        //Caller assigned to broadcasts
+        $('#BroadcastOn').click(function () {
+            refreshPeriod = 30;
+            clearInterval(refreshTicks);
+            window.console && console.log("refresh cleared");
+
+            $('#BroadcastOff').show();
+            $('#BroadcastOn').hide();
+            $('#Refresh').hide();
+            $('#refreshPeriod').hide();
+            $('#tabs').tabs('option', 'disabled', [null]);
+            tsl.liveTiming.RealTime(true);
+            tsl.liveTiming.StreamSectors = true;
+
+            hub = $.connection.liveTiming;
+            if (hub) {
+                hub.server.changeRegistration(tsl.liveTiming.eventID, realTime(), tsl.liveTiming.StreamSectors, tsl.liveTiming.StreamWeather);
+                tsl.liveTiming.refreshData();
+            }
+
+        });
+
+        //refresh button recognizes current tab and request information specific for current tab
+        $('#Refresh').click(refresh);
+    }
+
+    function onConnected() {
+
+        clearEvents(hub);
+
+        hub = $.connection.liveTiming;
+        hub.on('addIntermediate', updateIntermediateRow);
+        hub.on('updateResult', updateClassificationRow);
+        hub.on('controlBroadcast', updateSectorHeader);
+        hub.on('competitorPitOut', updateRowOutLap);
+        hub.on('updatePoints', updateCompetitorPoints);
+    }
+
+    function getCompetitorByID(id) {
+        return ko.utils.arrayFirst(tsl.liveTiming.viewModel.rows(), function (row) {
+            return row.competitorID() === id;
+        });
+    }
+
+    function refresh() {
+        refreshPeriod = 30;
+        tsl.liveTiming.refreshData();
+    }
+
+    function showPointsColumn() {
+        tsl.liveTiming.viewModel.ShowPoints(true);
+        return;
+
+        if (!_showingPointsColumn) {
+            $("td.points, th.points").show();
+            _showingPointsColumn = true;
+        }
+    }
+
+    function hidePointsColumn() {
+
+        tsl.liveTiming.viewModel.ShowPoints(false);
+        return;
+
+        if (_showingPointsColumn) {
+            $("td.points, th.points").hide();
+            _showingPointsColumn = false;
+        }
+    }
+
+    function updateClassificationRow(message) {
+
+        //checks if array already has a value for positon being broadcast
+        var match = getCompetitorByID(message.ID);
+
+        //upon no position currently in array insert position
+        if (!match) {
+            var newComp;
+
+            if (tsl.liveTiming.viewModel.sessionType() === "Rallycross") {
+                newComp = new rxRow();
+            } else if (tsl.liveTiming.viewModel.isGreenPowerEvent()) {
+                newComp = new greenPowerRow();
+            } else {
+                newComp = new row();
+            }
+
+            newComp.createPrevSessionEntries(tsl.liveTiming.viewModel.groupSessions());
+
+            if (message.Pos !== 0)
+                newComp.update(message);
+
+            ko.utils.arrayForEach(tsl.liveTiming.viewModel.TrackSectors(), function (item) {
+                newComp.createSectorObject(item.ID);
+            });
+
+            if (message.Pos !== 0)
+                tsl.liveTiming.viewModel.rows.push(newComp);
+
+            if (message.InPits) {
+                updateRowInPit(message);
+            }
+
+        } else {
+            if (message.InPits) {
+                updateRowInPit(message);
+            }
+            match.update(message);
+        }
+
+        if (message.Pos === 1) {
+            tsl.liveTiming.viewModel.raceTime(message.RaceTime);
+            tsl.liveTiming.viewModel.lap(message.Laps);
+        }
+
+        if (tsl.liveTiming.viewModel.BestTime() == "" && message.CurrentSessionBest != "") {
+            tsl.liveTiming.viewModel.BestTime(message.CurrentSessionBest);
+        } else if (tsl.shared.convertStringToAMBTimeStamp(tsl.liveTiming.viewModel.BestTime()) > tsl.shared.convertStringToAMBTimeStamp(message.CurrentSessionBest)) {
+            tsl.liveTiming.viewModel.BestTime(message.CurrentSessionBest);
+        }
+
+        tsl.liveTiming.viewModel.rows.sort(function (left, right) {
+            return left.position() == right.position() ? 0 : (left.position() < right.position() ? -1 : 1);
+        });
+
+
+        if (message.PredictedPoints !== undefined) {
+            showPointsColumn();
+        }
+    }
+
+    function updateIntermediateRow(message, IsFirstLoad) {
+
+        var match = ko.utils.arrayFirst(tsl.liveTiming.viewModel.rows(), function (row) {
+            return row.competitorID() === message.CompetitorID;
+        });
+
+        if (match) {
+
+            if (tsl.liveTiming.viewModel.sessionType() === "Rallycross") {
+                // Add the sector time to RX competitor's lap history
+                match.processIntermediate(message);
+                return;
+            }
+
+            var valueString = "";
+            if (message.Time) {
+                if (message.Time > 0) {
+                    valueString = tsl.shared.convertAMBTimeStampToString(message.Time);
+                    match[message.Id + "_PB"](message.BestTime == message.Time);
+
+                    match[message.Id + "_PrevValue"](match[message.Id + "_CurrentValue"]());
+                    match[message.Id + "_CurrentValue"](message.Time);
+                }
+                else if (message.Time == -1) {
+                    valueString = "OUT LAP";
+                    match[message.Id + "_PB"](false);
+                }
+            }
+
+            if (message.Speed) {
+                valueString = tsl.shared.trimSpeed(message.Speed);
+                match[message.Id + "_PB"](message.BestSpeed == message.Speed);
+            }
+
+            if (valueString !== "") {
+                match[message.Id](valueString);
+            }
+
+            var vm = tsl.liveTiming.viewModel;
+            var thisSector = vm.getSector(message.Id);
+
+            if (thisSector && !IsFirstLoad) {
+                var endPos = Math.floor(thisSector.StartPoint + thisSector.Length);
+
+                ko.utils.arrayForEach(vm.TrackSectors(), function (item) {
+
+                    if (Math.floor(item.StartPoint + item.Length) > endPos) {
+                        // Clear the time from this sector.
+
+                        //window.console && console.log("cleared " + item.Name + " " + match[item.ID]() + " with this sector " + thisSector.Name);
+                        match[item.ID]("");
+                        match[item.ID + "_PB"](false);
+                    }
+
+                });
+            }
+        }
+    }
+
+    function updateSectorHeader(message) {
+        // Check for sector flag message.
+        var messageText = message.Message.substring(10),
+            messageWords = messageText.split(' ');
+
+        var vm = tsl.liveTiming.viewModel;
+
+        // If the viewmodel has TrackSectors, check for flag message.
+        if (vm.TrackSectors) {
+
+            // If yellow flag in a sector, get the sector number and colour the SxTime column header yellow.
+            if (messageText.substring(0, 23) === "YELLOW FLAGS IN SECTOR ") {
+                var sectname = "#S" + messageWords[4] + "Time_header";
+                $(sectname).addClass('underYellow');
+            }
+            // Otherwise, if message is green flag in sector, get the sector number and colour the SxTime column header normally.
+            else if (messageWords[0] == "SECTOR" && messageWords[2] == "GREEN") {
+                var sectname = "#S" + messageWords[1] + "Time_header";
+                $(sectname).removeClass('underYellow');
+            }
+        }
+
+    }
+
+    function updateRowOutLap(message) {
+
+        var match = ko.utils.arrayFirst(tsl.liveTiming.viewModel.rows(), function (row) {
+            return row.competitorID() === message.CompetitorID;
+        });
+
+        var vm = tsl.liveTiming.viewModel;
+        var thisSector = vm.getFirstSector();
+        if (message.SectorID > 0 && (thisSector && message.SectorID !== thisSector.ID)) {
+            thisSector = vm.getSector(message.SectorID);
+        }
+
+        if (match && thisSector) {
+            match[thisSector.ID]("OUT LAP");
+            var endPos = Math.floor(thisSector.StartPoint + thisSector.Length);
+
+            // Clear times for all sectors after this one.
+            ko.utils.arrayForEach(vm.TrackSectors(), function (item) {
+                if (Math.floor(item.StartPoint + item.Length) > endPos) {
+                    match[item.ID]("");
+                    match[item.ID + "_PB"](false);
+                }
+            });
+        }
+    }
+
+    function updateRowInPit(message) {
+        var match = ko.utils.arrayFirst(tsl.liveTiming.viewModel.rows(), function (row) {
+            return row.competitorID() === message.ID;
+        });
+
+        var vm = tsl.liveTiming.viewModel;
+        var thisSector = vm.getFinishSector();
+
+        if (match && thisSector) {
+            match[thisSector.ID]("IN PIT");
+        }
+    }
+
+    function updateCompetitorPoints(message) {
+
+        showPointsColumn();
+
+        // Find the competitor that the message relates to.
+        var comp = getCompetitorByID(message.CID);
+        if (comp) {
+
+            // Update the competitor's points.
+            comp.setPoints(message.PredictedTotal);
+        }
+
+    }
+
+    function clearEvents() {
+
+        if (!hub) return;
+
+        hub.off('addIntermediate', updateIntermediateRow);
+        hub.off('updateResult', updateClassificationRow);
+        hub.off('trackSector');
+        hub.off('controlBroadcast', updateSectorHeader);
+        hub.off('competitorPitOut', updateRowOutLap);
+        hub.off('updatePoints', updateCompetitorPoints);
+    }
+
+    init();
+
+    return {
+        onConnected: onConnected,
+        updateClassificationRow: updateClassificationRow,
+        updateIntermediateRow: updateIntermediateRow
+    };
+
+}();;tsl = namespace('tsl');
+
+tsl.app = function() {
+
+    var self = this;
+
+    self.Broadcast = tsl.liveTiming.RealTime;
+    self.WeatherBroadcast = tsl.liveTiming.StreamWeather;
+    self.BroadcastSectors = tsl.liveTiming.StreamSectors;
+    self.currentTab = "Classification";
+
+    self.audioEnabled = false;
+    self.audioURL = null;
+    self.audio = null;
+
+    if ($(window).width() < 480) {
+        BroadcastSectors = false;
+    } else {
+        BroadcastSectors = true;
+    }
+
+    //allows tabular representation with jquery-ui
+    var $tab = $("#tabs").tabs({
+        activate: function(event, ui) {
+            if (ui.newTab[0].id == "Tracking") {
+                if (Tracking) {
+                    Tracking.scalePath();
+                    $('.classButton').hide();
+                    $('.trackButton').show();
+                    $('#help-key').show();
+                }
+            } else if (ui.newTab[0].id == "Weather") {
+                if (Weather) {
+                    Weather.SizeWeatherDiv();
+                    $('.classButton').hide();
+                    $('.trackButton').hide();
+                    $('#help-key').show();
+                }
+            } else if (ui.newTab[0].id == "Classification") {
+                if (Classification) {
+                    $('.classButton').show();
+                    $('.trackButton').hide();
+                    $('#help-key').show();
+                }
+            }
+            else if (ui.newTab[0].id == "Statistics") {
+                if (Statistics) {
+                    $('.classButton').hide();
+                    $('.trackButton').hide();
+                    $('#help-key').hide();
+                }
+            }
+            else if (ui.newTab[0].id == "LapChart") {
+                if (LapChart) {
+                    $('.classButton').hide();
+                    $('.trackButton').hide();
+                    $('#help-key').hide();
+                    LapChart.forceInitialize = true;
+                    LapChart.onConnected();
+                }
+            }
+
+
+            currentTab = ui.newTab[0].id;
+        }
+    });
+
+    function init() {
+        var hub = $.connection.liveTiming;
+
+
+        hub.client.setTimeRemaining = function(message) {
+            tsl.liveTiming.viewModel.updateTimeRemaining(message);
+        };
+
+        $('#rc_button').click(function () {
+            if ($('#rc_tab').is(':visible')) {
+                $('.fillTab').height($('#ResultsTableContainer').height() + $('#rc_tab').height());
+                $('#rc_tab').toggle();
+                try {
+                    $('#FloatOptions').css("top", $("#footer").offset().top - $('#FloatOptions').height() - 3);
+                    Weather.SizeWeatherDiv();
+                    Tracking.scalePath();
+                } catch (e) {
+                    console.error(e);
+                }
+            } else {
+                $('#rc_tab').toggle();
+                $('.fillTab').height($('#ResultsTableContainer').height() - $('#rc_tab').height());
+                $("#rc_button").stop(true, true, true).show();
+                $("#rc_button").css('opacity', 1);
+                try {
+                    $('#FloatOptions').css("top", $('#footer').offset().top - $('#FloatOptions').height() - 3);
+                    Weather.SizeWeatherDiv();
+                    Tracking.scalePath();
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+        });
+
+        hub.on('controlBroadcast', function(message) {
+            if (message.Message != null) {
+
+                if ($('#rc_tab').is(':hidden') && message.Message != "") {
+                    $("#rc_button").effect("pulsate", { times: 15 }, 30000);
+                } else {
+                    $("#rc_button").stop(true, true, true).show();
+                    $("#rc_button").css('opacity', 1);
+                }
+                if (message.Line == 1) {
+                    tsl.liveTiming.viewModel.RaceLineOne(message.Message);
+                    if (message.Type === "U") {
+                        $("#Control1").effect("pulsate", { times: 40 }, 120000);
+                    } else {
+                        $("#Control1").stop(true, true, true).show();
+                        $("#Control1").css('opacity', 1);
+                    }
+                } else if (message.Line == 2) {
+                    tsl.liveTiming.viewModel.RaceLineTwo(message.Message);
+                    if (message.Type === "U") {
+                        $("#Control2").effect("pulsate", { times: 40 }, 120000);
+                    } else {
+                        $("#Control2").stop(true, true, true).show();
+                        $("#Control2").css('opacity', 1);
+                    }
+                } else if (message.Line == "B") {
+                    tsl.liveTiming.viewModel.RaceLineOne(message.Message);
+                    tsl.liveTiming.viewModel.RaceLineTwo(message.Message);
+                }
+                render();
+            }
+        });
+
+        // Configure audio player.
+        if (self.audioEnabled && (typeof (Audio) !== "undefined")) {
+
+            $("#radioPlayer").removeClass("hidden");
+
+            $('#radioPlayer #controls').click(function() {
+
+                if (self.audio == null) {
+                    self.audio = new Audio();
+                }
+
+                if (self.audio.paused) {
+                    audio.src = self.audioURL;
+                    self.audio.play();
+                    $(this).addClass('play');
+                    $('#radioPlayer #radioStatus').text('Commentary Streaming');
+                } else {
+                    self.audio.pause();
+
+                    // Set the source to null to stop the download of the stream.
+                    self.audio.src = null;
+                    $(this).removeClass('play');
+                    $('#radioPlayer #radioStatus').text('Commentary Stopped');
+                }
+
+            });
+        }
+
+        //--------------------- window resize ----------------------- \\
+        $(window).on('resize', render);
+    }
+
+    function helpContext() { // Gets the index of the selected tab and shows/hides appropriate Help context information
+        var $tabs = $('#tabs').tabs();
+        var selected = $tabs.tabs('option', 'selected')
+        switch (selected) {
+            case 0: // If Classification tab is active, show ClassificationHelp and hide the others.
+                {
+                    $('#ClassificationHelp').show();
+                    $('#TrackingHelp').hide();
+                    $('#WeatherHelp').hide();
+                    $('#dialog-help').dialog('option', 'title', 'Help - Classification'); // Set the title of the dialog box appropriately.
+                    break;
+                }
+            case 1: // If Tracking tab is active, show TrackingHelp and hide the others.
+                {
+                    $('#TrackingHelp').show();
+                    $('#ClassificationHelp').hide();
+                    $('#WeatherHelp').hide();
+                    $('#dialog-help').dialog('option', 'title', 'Help - Tracking'); // Set the title of the dialog box appropriately.
+                    break;
+                }
+            case 2: // If Weather tab is active, show WeatherHelp and hide the others.
+                {
+                    $('#WeatherHelp').show();
+                    $('#ClassificationHelp').hide();
+                    $('#TrackingHelp').hide();
+                    $('#dialog-help').dialog('option', 'title', 'Help - Weather'); // Set the title of the dialog box appropriately.
+                    break;
+                }
+        }
+    }
+
+    function render() {
+        var tabContainer = $('#tabs');
+        tabContainer.height($(window).height() - (tabContainer.offset().top + $('#footer').height()));
+
+        $('.fillTab').height($('#tabs').height() - ($('#tabs-content').height() + 35) - ($('#rc_tab').is(':hidden') ? 0 : $('#rc_tab').height())); //keep table data within window
+        $("#help-key").click(function() { // On the help key being pressed, decide which help dialog to open.
+            helpContext();
+            $("#dialog-help").dialog("open");
+
+        });
+        $('#FloatOptions').css("top", $("#footer").offset().top - $('#FloatOptions').height() - 3);
+        if ($(window).width() < 560 && $("#tabs").tabs("option", "selected") == 1) {
+            $("#tabs").tabs("option", "active", 0);
+        }
+        if ($(window).width() < 480) {
+            $('#rc_button').val('RC');
+            //$('#help-key').val('?');
+
+        } else {
+            $('#rc_button').val('Race Control Messages');
+            //$('#help-key').val('Help');
+        }
+
+        $("#dialog-help").dialog({
+            autoOpen: false,
+            dialogClass: "user-help-dialog",
+            modal: true,
+            draggable: true,
+            closeText: "hide",
+            resizable: false,
+            maxHeight: 420,
+            width: 300,
+            buttons: {
+                Close: function() {
+                    $(this).dialog('close');
+                }
+            }
+        });
+
+
+        $(window).resize(function() { // On resize of the browser window:
+            $('#dialog-help').dialog("option", "position", { my: "center", at: "center", of: window }); // Keep the dialog box in the center of the screen.
+            if ($(window).height() < 420) {
+                $('#dialog-help').dialog("option", "height", ($(window).height() - 30)); // If the browser is less than 420px high, resize the dialog height to 30px less it.
+            } else {
+                $('#dialog-help').dialog('option', 'height', $('#dialog-help').dialog('option', 'maxHeight'));
+            }
+            if ($(window).width() < 300) {
+                $('#dialog-help').dialog("option", "width", ($(window).width() - 30)); // If the browser is less than 420px wide, resize the dialog width to 30px less than it.
+            } else {
+                $('#dialog-help').dialog('option', 'width', 300);
+            }
+        });
+
+
+    }
+
+    function start(eventID, audioEnabled, audioURL) {
+        tsl.liveTiming.eventID = eventID;
+        tsl.liveTiming.viewModel.IsWorldRX = ((eventID.toUpperCase().indexOf('_WRX') > -1) || (eventID.toUpperCase().indexOf('_NRX') > -1));
+
+        self.audioEnabled = audioEnabled;
+        self.audioURL = audioURL;
+
+        ko.applyBindings(tsl.liveTiming.viewModel);
+
+        $.connection.hub.stateChanged(function(change) {
+            if (change.newState === $.signalR.connectionState.reconnecting) {
+                tsl.liveTiming.viewModel.ConnectionStatus("Re-connecting");
+                window.console && console.log("Reconnecting");
+            } else if (change.newState === $.signalR.connectionState.connecting) {
+                window.console && console.log("Connecting");
+            } else if (change.newState === $.signalR.connectionState.connected) {
+                hub = $.connection.liveTiming;
+                window.console && console.log("Connected");
+
+                tsl.liveTiming.refreshData();
+
+                hub.server.registerConnectionId(tsl.liveTiming.eventID, Broadcast(), tsl.liveTiming.StreamSectors, tsl.liveTiming.StreamWeather);
+                render();
+            } else if (change.newState === $.signalR.connectionState.disconnected) {
+                window.console && console.log("Hub stopped, establishing connection!");
+
+            }
+        });
+
+        init();
+        $.connection.hub.start();
+    }
+
+    function setIsGreenPowerEvent(isGreenPower) {
+        tsl.liveTiming.viewModel.setIsGreenPowerEvent(isGreenPower);
+    }
+
+    return {
+        start: start,
+        setIsGreenPowerEvent: setIsGreenPowerEvent
+    };
+
+}();;
