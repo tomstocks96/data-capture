@@ -20,10 +20,10 @@ class TableParser:
                metadata[column_name] = doc.get(column_name,'')
                doc.pop(column_name,None)
 
-               for data_column in doc:
-                   unpivoted_doc = dict(metadata)
-                   unpivoted_doc['key'] = data_column
-                   unpivoted_doc['value'] = doc[data_column]
-                   unpivoted_data.append(unpivoted_doc)
-        
-      return doc_array
+         for data_column in doc:
+               unpivoted_doc = dict(metadata)
+               unpivoted_doc['key'] = data_column
+               unpivoted_doc['value'] = doc[data_column]
+               unpivoted_data.append(unpivoted_doc)
+   
+      return unpivoted_data

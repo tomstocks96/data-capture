@@ -43,6 +43,7 @@ class TslInterface:
         self.driver.find_element(by='id', value='acceptTerms').click()
 
     def _get_metadata(self: str) -> str:
+        time.sleep(3)
         series = self.driver.find_element(by='id', value='seriesName').text
         session = self.driver.find_element(by='id', value='sessionName').text
 
