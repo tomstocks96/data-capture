@@ -4,7 +4,6 @@ version = "0.1.0"
 description = ""
 authors = ["Thomas Stocks <tstocks@mercedesamgf1.com>"]
 readme = "README.md"
-packages = [{include = "data_capture"}]
 
 [tool.poetry.dependencies]
 python = "^3.8"

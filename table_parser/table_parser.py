@@ -24,6 +24,7 @@ class TableParser:
                unpivoted_doc = dict(metadata)
                unpivoted_doc['key'] = data_column
                unpivoted_doc['value'] = doc[data_column]
-               unpivoted_data.append(unpivoted_doc)
+               if unpivoted_doc['value'] != 'NaN':
+                  unpivoted_data.append(unpivoted_doc)
    
       return unpivoted_data
