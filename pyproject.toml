@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "data-capture"
+version = "0.1.0"
+description = ""
+authors = ["Thomas Stocks <tstocks@mercedesamgf1.com>"]
+readme = "README.md"
+packages = [{include = "data_capture"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+pandas = "^1.5.3"
+requests = "^2.28.2"
+selenium = "^4.8.2"
+lxml = "^4.9.2"
+html5lib = "^1.1"
+bs4 = "^0.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
