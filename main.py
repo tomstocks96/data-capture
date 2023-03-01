@@ -18,8 +18,6 @@ if __name__ == '__main__':
 
     scrape_url = os.environ['SCRAPE_URL']
 
-    url = 'https://livetiming.tsl-timing.com/230812?_gl=1*um61uw*_ga*MTA1MzIxMTgzOC4xNjc2NjQwMDk1*_ga_B9ZGX55TXH*MTY3NzEzODM5My4yLjEuMTY3NzE0MDgwMi4wLjAuMA..'
-    url = 'https://livetiming.tsl-timing.com/230918?_gl=1*7k5f42*_ga*MTA1MzIxMTgzOC4xNjc2NjQwMDk1*_ga_B9ZGX55TXH*MTY3NzY3NTMzNy4xMC4xLjE2Nzc2NzU3MDQuMC4wLjA.'
     parser = TableParser()
 
     kafka_producer = Producer({'bootstrap.servers': 'kafka:29092'})
