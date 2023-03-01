@@ -5,13 +5,16 @@ import pandas as pd
 from selenium import webdriver
 
 class TableParser:
-    def __init__(self):
+   def __init__(self):
        pass
+   
+   def isNaN(self, num):
+      return num != num
 
-    def parse_rows(self, table: pd.DataFrame, 
-                   metadata: dict = {}, 
-                   metadata_in_row: List[str] = []) -> List[dict]:
-        
+   def parse_rows(self, table: pd.DataFrame, 
+                  metadata: dict = {}, 
+                  metadata_in_row: List[str] = []) -> List[dict]:
+      
       unpivoted_data = []
       doc_array = table.to_dict(orient='records')
 
@@ -24,7 +27,7 @@ class TableParser:
                unpivoted_doc = dict(metadata)
                unpivoted_doc['key'] = data_column
                unpivoted_doc['value'] = doc[data_column]
-               if unpivoted_doc['value'] != 'NaN':
+               if not str(unpivoted_doc['value']) in ['NaN', 'nan']:
                   unpivoted_data.append(unpivoted_doc)
-   
+
       return unpivoted_data

@@ -9,14 +9,6 @@ networks:
 
 services:
 
-  scrape-orchestrator:
-    build: 
-      dockerfile: ./Dockerfile
-    container_name: scrape-orchestrator
-    networks:
-      - kafka
-      - scrape
-
   scrape-agent:
     image: selenium/standalone-chrome:latest
     hostname: scrape-agent
@@ -27,3 +19,15 @@ services:
       - scrape
     volumes:
       - /dev/shm:/dev/shm
+  scrape-orchestrator:
+    build: 
+      dockerfile: ./Dockerfile
+    container_name: scrape-orchestrator
+    environment:
+      - SCRAPE_URL='https://livetiming.tsl-timing.com/230918?_gl=1*7k5f42*_ga*MTA1MzIxMTgzOC4xNjc2NjQwMDk1*_ga_B9ZGX55TXH*MTY3NzY3NTMzNy4xMC4xLjE2Nzc2NzU3MDQuMC4wLjA.'
+    networks:
+      - kafka
+      - scrape
+    depends_on:
+      - scrape-agent
+

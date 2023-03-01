@@ -1,4 +1,4 @@
-import requests, time, datetime, logging, json, sys
+import requests, time, datetime, logging, json, sys, os
 
 from confluent_kafka import Producer
 
@@ -16,13 +16,16 @@ if __name__ == '__main__':
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
+    scrape_url = os.environ['SCRAPE_URL']
+
     url = 'https://livetiming.tsl-timing.com/230812?_gl=1*um61uw*_ga*MTA1MzIxMTgzOC4xNjc2NjQwMDk1*_ga_B9ZGX55TXH*MTY3NzEzODM5My4yLjEuMTY3NzE0MDgwMi4wLjAuMA..'
+    url = 'https://livetiming.tsl-timing.com/230918?_gl=1*7k5f42*_ga*MTA1MzIxMTgzOC4xNjc2NjQwMDk1*_ga_B9ZGX55TXH*MTY3NzY3NTMzNy4xMC4xLjE2Nzc2NzU3MDQuMC4wLjA.'
     parser = TableParser()
 
-    kafka_producer = Producer({'bootstrap.servers': 'localhost:29092'})
+    kafka_producer = Producer({'bootstrap.servers': 'kafka:29092'})
 
     logger.info('starting scrape loop')
-    with TslInterface(session_url=url) as tsl_interface:
+    with TslInterface(session_url=scrape_url) as tsl_interface:
         metadata_in_row = ['Name', 'No']
         previous_reads = []
         while True:
@@ -40,7 +43,7 @@ if __name__ == '__main__':
                     document_to_produce['scrape_timestamp'] = datetime.datetime.now()
                     document_to_produce = json.dumps(document_to_produce, sort_keys=True, default=str)
                     logger.debug(f'producing document {document_to_produce}')
-                    # kafka_producer.produce('tsl-monitor-timings', document_to_produce.encode('utf-8'))
+                    kafka_producer.produce('tsl-monitor-timings', document_to_produce.encode('utf-8'), 'timing'.encode('utf8'))
             previous_reads = data
             kafka_producer.flush()
             
