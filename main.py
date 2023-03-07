@@ -16,7 +16,8 @@ if __name__ == '__main__':
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-    scrape_url = os.environ['SCRAPE_URL']
+    #scrape_url = os.environ['SCRAPE_URL']
+    scrape_url = 'https://livetiming.tsl-timing.com/231018'
 
     parser = TableParser()
 
@@ -24,25 +25,23 @@ if __name__ == '__main__':
 
     logger.info('starting scrape loop')
     with TslInterface(session_url=scrape_url) as tsl_interface:
-        metadata_in_row = ['Name', 'No']
-        previous_reads = []
         while True:
             logger.info('getting metadata')
             metadata = tsl_interface._get_metadata()
             logger.info('getting table')
             table = tsl_interface._get_table()
             logger.info('parsing table')
-            data = parser.parse_rows(table, metadata, metadata_in_row)
+            data = parser.parse_rows(table, metadata)
     
             logger.info('parsing rows')
             for document in data:
-                if document not in previous_reads:
-                    document_to_produce = dict(document)
-                    document_to_produce['scrape_timestamp'] = datetime.datetime.now()
-                    document_to_produce = json.dumps(document_to_produce, sort_keys=True, default=str)
-                    logger.debug(f'producing document {document_to_produce}')
-                    kafka_producer.produce('tsl-monitor-timings', document_to_produce.encode('utf-8'), 'timing'.encode('utf8'))
-            previous_reads = data
+                document_to_produce = dict(document)
+                document_to_produce['scrape_timestamp'] = datetime.datetime.now()
+                document_to_produce = json.dumps(document_to_produce, sort_keys=True, default=str)
+
+                logger.debug(f'producing document {document_to_produce}')
+                kafka_producer.produce('tsl-monitor-timings', document_to_produce.encode('utf-8'), 'timing'.encode('utf8'))
+                
             kafka_producer.flush()
             
             logger.info('sleeping before next scrape')

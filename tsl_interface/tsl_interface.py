@@ -4,9 +4,12 @@ import requests, time, datetime, logging
 import pandas as pd
 from selenium import webdriver
 
+from selenium.common.exceptions import NoSuchElementException
+
 class TslInterface:
     def __init__(self, session_url:str):
         self.url = session_url
+        self.logger = logging.getLogger(__name__)
 
     def __enter__(self):
         self._open_page()
@@ -33,29 +36,45 @@ class TslInterface:
         command_executor='http://scrape-agent:4444/wd/hub',
         options=options
         )
-        print('Executing')
         #maximize the window size
         self.driver.maximize_window()
+        self.logger.info('driver initiated')
         #navigate to browserstack.com
         self.driver.get(url=self.url)
-        #click on the Get started for free button
+        self.logger.info('driver loaded webpage')
         time.sleep(3)
-        self.driver.find_element(by='id', value='acceptTerms').click()
+        try: 
+            self.driver.find_element(by='id', value='acceptTerms').click()
+        except NoSuchElementException:
+            self.logger.error(f'T&C accept button could not be found')
+            raise
 
-    def _get_metadata(self: str) -> str:
+
+    def _get_metadata(self) -> dict:
         time.sleep(3)
-        series = self.driver.find_element(by='id', value='seriesName').text
-        session = self.driver.find_element(by='id', value='sessionName').text
+        try:
+            series = self.driver.find_element(by='id', value='seriesName').text
+        except NoSuchElementException:
+            self.logger.warn(f'series metadata could not be found')
+            raise
 
+        try:
+            session = self.driver.find_element(by='id', value='sessionName').text
+        except NoSuchElementException:
+            self.logger.warn(f'session metadata could not be found')
+            raise
+        
         session_date = datetime.datetime.now().date()
         metadata = {
             'series': series,
             'session': session,
             'date': session_date
         }
+    
         return metadata
+        
 
-    def _get_table(self: str) -> str:
+    def _get_table(self) -> pd.DataFrame:
         table = self.driver.find_element(by='id', value='ResultsTableContainer')
         sub_table = table.find_element(by='id', value='tablebody')
         
