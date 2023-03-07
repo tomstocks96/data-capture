@@ -51,7 +51,7 @@ class TslInterface:
 
 
     def _get_metadata(self) -> dict:
-        time.sleep(3)
+        time.sleep(1)
         try:
             series = self.driver.find_element(by='id', value='seriesName').text
         except NoSuchElementException:
@@ -78,7 +78,7 @@ class TslInterface:
         table = self.driver.find_element(by='id', value='ResultsTableContainer')
         sub_table = table.find_element(by='id', value='tablebody')
         
-        time.sleep(3)
+        time.sleep(1)
         html = sub_table.get_attribute('outerHTML')
         table = pd.read_html(html)
         table = table[0]
