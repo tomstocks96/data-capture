@@ -6,7 +6,6 @@ from tsl_interface.tsl_interface import TslInterface
 from table_parser.table_parser import TableParser
 
 if __name__ == '__main__':
-
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
 
@@ -20,6 +19,10 @@ if __name__ == '__main__':
     scrape_url = 'https://livetiming.tsl-timing.com/231018'
 
     parser = TableParser()
+
+    # sleep to allow scrape agent to boot
+    logger.info('Internal set up done, sleeping to ensure dependency availability')
+    time.sleep(5)
 
     kafka_producer = Producer({'bootstrap.servers': 'kafka:29092'})
 
