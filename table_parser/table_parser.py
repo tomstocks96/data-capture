@@ -22,6 +22,8 @@ class TableParser:
 
       for doc in doc_array:
          doc.update(metadata)
+         if 'S3' in doc.keys():
+            doc['Laps'] = doc['Laps']
          if doc not in self.previous_reads:
             self.logger.debug(f'new document {doc}')
             data.append(doc)
