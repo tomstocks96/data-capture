@@ -48,5 +48,5 @@ if __name__ == '__main__':
             kafka_producer.flush()
             
             logger.info('sleeping before next scrape')
-            time.sleep(1)
+            time.sleep(8)
 
