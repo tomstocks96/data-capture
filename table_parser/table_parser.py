@@ -22,7 +22,9 @@ class TableParser:
 
       for doc in doc_array:
          doc.update(metadata)
-         self.logger.debug(f'checking keys for sector 3 time: {doc.keys()}')
+         self.logger.debug(f'checking keys for sector 3 time')
+         S3 = doc.get('S3', 'Not Present')
+         self.logger.debug(f'S3 time was: {S3}')
 
          if 'S3' in doc.keys() and doc.get('S3','') != 'IN PIT':
             laps = doc['Laps']
