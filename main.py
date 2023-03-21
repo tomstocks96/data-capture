@@ -15,8 +15,7 @@ if __name__ == '__main__':
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-    #scrape_url = os.environ['SCRAPE_URL']
-    scrape_url = 'https://livetiming.tsl-timing.com/231018'
+    scrape_url = os.environ['SCRAPE_URL']
 
     parser = TableParser()
 

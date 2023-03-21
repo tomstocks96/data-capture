@@ -23,10 +23,12 @@ class TableParser:
       for doc in doc_array:
          doc.update(metadata)
          self.logger.debug(f'checking keys for sector 3 time: {doc.keys()}')
-         if 'S3' in doc.keys():
+
+         if 'S3' in doc.keys() and doc.get('S3','') != 'IN PIT':
             laps = doc['Laps']
             self.logger.debug(f'S3 time detected, laps went from {laps} to {laps - 1}')
             doc['Laps'] = doc['Laps'] - 1
+            
          if doc not in self.previous_reads:
             self.logger.debug(f'new document {doc}')
             data.append(doc)
