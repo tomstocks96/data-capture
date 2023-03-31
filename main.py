@@ -16,6 +16,7 @@ if __name__ == '__main__':
     logger.addHandler(handler)
 
     scrape_url = os.environ['SCRAPE_URL']
+    # scrape_url = 'https://livetiming.tsl-timing.com/231218'
 
     parser = TableParser()
 
@@ -24,6 +25,7 @@ if __name__ == '__main__':
     time.sleep(5)
 
     kafka_producer = Producer({'bootstrap.servers': 'kafka:29092'})
+    # kafka_producer = Producer({'bootstrap.servers': 'localhost:9092'})
 
     logger.info('starting scrape loop')
     with TslInterface(session_url=scrape_url) as tsl_interface:

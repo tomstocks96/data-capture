@@ -13,6 +13,7 @@ services:
     image: selenium/standalone-chrome:latest
     hostname: scrape-agent
     container_name: scrape-agent
+    restart: always
     ports:
       - 4444:4444
     networks:
@@ -23,8 +24,9 @@ services:
     build: 
       dockerfile: ./Dockerfile
     container_name: scrape-orchestrator
+    restart: always
     environment:
-      - SCRAPE_URL=https://livetiming.tsl-timing.com/231245
+      - SCRAPE_URL=https://livetiming.tsl-timing.com/231315
     networks:
       - kafka
       - scrape
