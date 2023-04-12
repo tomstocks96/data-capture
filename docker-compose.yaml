@@ -26,7 +26,7 @@ services:
     container_name: scrape-orchestrator
     restart: always
     environment:
-      - SCRAPE_URL=https://livetiming.tsl-timing.com/231315
+      - SCRAPE_URL=https://livetiming.tsl-timing.com/231545
     networks:
       - kafka
       - scrape

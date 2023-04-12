@@ -5,7 +5,7 @@ import pandas as pd
 from selenium import webdriver
 
 from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.common.by import By
+
 class TslInterface:
     def __init__(self, session_url:str):
         self.url = session_url
@@ -34,7 +34,6 @@ class TslInterface:
         options.add_argument("--no-sandbox") # // Bypass OS security model
         self.driver = webdriver.Remote(
         command_executor='http://scrape-agent:4444/wd/hub',
-        # command_executor='http://localhost:4444/wd/hub',
         options=options
         )
         #maximize the window size
@@ -44,23 +43,23 @@ class TslInterface:
         self.driver.get(url=self.url)
         self.logger.info('driver loaded webpage')
         time.sleep(3)
-        # try: 
-        #     self.driver.find_element(by='id', value='acceptTerms').click()
-        # except NoSuchElementException:
-        #     self.logger.error(f'T&C accept button could not be found')
-        #     raise
+        try: 
+            self.driver.find_element(by='id', value='acceptTerms').click()
+        except NoSuchElementException:
+            self.logger.error(f'T&C accept button could not be found')
+            raise
 
 
     def _get_metadata(self) -> dict:
         time.sleep(1)
         try:
-            series = self.driver.find_element(by=By.CLASS_NAME, value='seriesName').text
+            series = self.driver.find_element(by='id', value='seriesName').text
         except NoSuchElementException:
             self.logger.warn(f'series metadata could not be found')
             raise
 
         try:
-            session = self.driver.find_element(by=By.CLASS_NAME, value='sessionName').text
+            session = self.driver.find_element(by='id', value='sessionName').text
         except NoSuchElementException:
             self.logger.warn(f'session metadata could not be found')
             raise
@@ -76,10 +75,11 @@ class TslInterface:
         
 
     def _get_table(self) -> pd.DataFrame:
-        table = self.driver.find_element(by=By.XPATH, value='//table[contains(@class,"result-table")]')
+        table = self.driver.find_element(by='id', value='ResultsTableContainer')
+        sub_table = table.find_element(by='id', value='tablebody')
         
         time.sleep(1)
-        html = table.get_attribute('outerHTML')
+        html = sub_table.get_attribute('outerHTML')
         table = pd.read_html(html)
         table = table[0]
 
