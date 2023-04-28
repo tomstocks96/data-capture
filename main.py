@@ -14,7 +14,7 @@ if __name__ == '__main__':
     if args.environment == 'host':
         KAFKA_URL = 'localhost:9092'
         AGENT_URL = 'http://localhost:4444/wd/hub'
-        SCRAPE_URL = 'https://livetiming.tsl-timing.com/231541'
+        SCRAPE_URL = 'https://lt-new.tsl-timing.com/231750'
         
     elif args.environment == 'docker':
         KAFKA_URL = 'kafka:29092'
