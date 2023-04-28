@@ -1,5 +1,5 @@
 import pandas as pd
-import requests, time, datetime, logging
+import requests, time, datetime, logging, os
 
 import pandas as pd
 from selenium import webdriver
@@ -45,53 +45,48 @@ class TslInterface:
         self.driver.get(url=self.session_url)
         self.logger.info('driver loaded webpage')
         time.sleep(3)
-        try: 
-            self.driver.find_element(by='id', value='acceptTerms').click()
-        except NoSuchElementException:
-            self.logger.error(f'T&C accept button could not be found')
-            raise
+        # try: 
+        #     self.driver.find_element(by='id', value='acceptTerms').click()
+        # except NoSuchElementException:
+        #     self.logger.error(f'T&C accept button could not be found')
+        #     raise
 
 
     def _get_metadata(self) -> dict:
         time.sleep(1)
         try:
-            series = self.driver.find_element(by=By.XPATH, value='//span[contains(@data-bind, "seriesName")]').text
+            series = self.driver.find_element(by=By.XPATH, value='//h1[contains(@class, "seriesName")]').text
         except NoSuchElementException:
             self.logger.warn(f'series metadata could not be found')
             raise
 
         try:
-            session = self.driver.find_element(by=By.XPATH, value='//span[contains(@data-bind, "sessionName")]').text
+            session = self.driver.find_element(by=By.XPATH, value='//h2[contains(@class, "sessionName")]').text
         except NoSuchElementException:
             self.logger.warn(f'session metadata could not be found')
             raise
 
         try:
-            circuit = self.driver.find_element(by=By.XPATH, value='//span[contains(@data-bind, "trackDisplayName")]').text
+            
+            circuit = os.environ.get('CIRCUIT', 'Unspecified')
         except NoSuchElementException:
             self.logger.warn(f'circuit metadata could not be found')
             raise
 
         try:
-            weather_conditions = self.driver.find_element(by=By.XPATH, value='//span[contains(@data-bind, "weatherConditions")]').text
+            weather_conditions = self.driver.find_element(by=By.XPATH, value='//div[contains(@class, "weather widget")]/span').text
+        except NoSuchElementException:
+            self.logger.warn(f'weather metadata could not be found')
+            raise
+
+        try:
+            circuit_conditions = self.driver.find_element(by=By.XPATH, value='//div[contains(@class, "track widget")]/span').text
         except NoSuchElementException:
             self.logger.warn(f'circuit metadata could not be found')
             raise
 
         try:
-            circuit_conditions = self.driver.find_element(by=By.XPATH, value='//span[contains(@data-bind, "trackConditions")]').text
-        except NoSuchElementException:
-            self.logger.warn(f'circuit metadata could not be found')
-            raise
-
-        try:
-            session_time_remaining = self.driver.find_element(by=By.ID, value='sessionTime').text
-        except NoSuchElementException:
-            self.logger.warn(f'circuit metadata could not be found')
-            raise
-
-        try:
-            track_status = self.driver.find_element(by=By.ID, value='currentflag').text
+            track_status = self.driver.find_element(by=By.XPATH, value='//div[contains(@class, "statusText")]').text
         except NoSuchElementException:
             self.logger.warn(f'circuit metadata could not be found')
             raise
@@ -105,19 +100,17 @@ class TslInterface:
             'date': session_date,
             'weather_conditions': weather_conditions,
             'circuit_conditions': circuit_conditions,
-            'track_status': track_status,
-            'session_time_remaining': session_time_remaining
+            'track_status': track_status
         }
     
         return metadata
         
 
     def _get_table(self) -> pd.DataFrame:
-        table = self.driver.find_element(by='id', value='ResultsTableContainer')
-        sub_table = table.find_element(by='id', value='tablebody')
+        table = self.driver.find_element(by=By.XPATH, value='//table[contains(@class, "result-table banded sticky")]')
         
         time.sleep(1)
-        html = sub_table.get_attribute('outerHTML')
+        html = table.get_attribute('outerHTML')
         table = pd.read_html(html)
         table = table[0]
 
